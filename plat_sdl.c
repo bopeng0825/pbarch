@@ -373,8 +373,10 @@ finish:
 static void plat_sound_callback(void *unused, uint8_t *stream, int len)
 {
 	int16_t *p = (int16_t *)stream;
-	if (audio.buf_len == 0)
+	if (audio.buf_len == 0) {
+		memset(stream, 0, len);
 		return;
+	}
 
 	len /= (sizeof(int16_t) * 2);
 
@@ -390,6 +392,7 @@ static void plat_sound_callback(void *unused, uint8_t *stream, int len)
 	}
 
 	while(len > 0) {
+		*p++ = 0;
 		*p++ = 0;
 		--len;
 	}
@@ -407,13 +410,15 @@ static void plat_sound_finish(void)
 
 static int plat_sound_init(void)
 {
+	int requested_sample_rate = sample_rate > 0 ? sample_rate : 44100;
+
 	if (SDL_InitSubSystem(SDL_INIT_AUDIO)) {
 		return -1;
 	}
 
 	SDL_AudioSpec spec, received;
 
-	spec.freq = MIN(sample_rate, MAX_SAMPLE_RATE);
+	spec.freq = MIN(requested_sample_rate, MAX_SAMPLE_RATE);
 	spec.format = AUDIO_S16;
 	spec.channels = 2;
 	spec.samples = 512;
@@ -424,7 +429,7 @@ static int plat_sound_init(void)
 		return -1;
 	}
 
-	audio.in_sample_rate = sample_rate;
+	audio.in_sample_rate = requested_sample_rate;
 	audio.out_sample_rate = received.freq;
 	audio.sample_rate_adj = audio.out_sample_rate * DRC_MAX_ADJUSTMENT;
 	audio.adj_out_sample_rate = audio.out_sample_rate;
