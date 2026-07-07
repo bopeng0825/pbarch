@@ -20,6 +20,11 @@ static inline bool has_suffix_i(const char *str, const char *suffix) {
 	return !strcasecmp(p, suffix);
 }
 
+static inline const char *path_basename(const char *path) {
+	const char *base = strrchr(path, '/');
+	return base ? base + 1 : path;
+}
+
 struct string_list *string_split(const char *string, char delim);
 void string_list_free(struct string_list *list);
 
