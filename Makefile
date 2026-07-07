@@ -197,15 +197,6 @@ print-%:
 .PHONY: all
 all: $(BIN) cores
 
-libpicofe/.patched:
-	cd libpicofe && ($(foreach patch, $(sort $(wildcard patches/libpicofe/*.patch)), patch --no-backup-if-mismatch --merge -p1 < ../$(patch) &&) touch .patched)
-
-reverse = $(if $(wordlist 2,2,$(1)),$(call reverse,$(wordlist 2,$(words $(1)),$(1))) $(firstword $(1)),$(1))
-
-.PHONY: clean-libpicofe
-clean-libpicofe:
-	test ! -f libpicofe/.patched || (cd libpicofe && ($(foreach patch, $(call reverse,$(sort $(wildcard patches/libpicofe/*.patch))), patch -R --merge --no-backup-if-mismatch -p1 < ../$(patch) &&) rm .patched))
-
 CFLAGS += -MMD -MP
 DEPS=$(SOURCES:.c=.d)
 $(DEPS):
@@ -214,7 +205,7 @@ include $(wildcard $(DEPS))
 
 OBJS = $(SOURCES:.c=.o)
 
-$(BIN): libpicofe/.patched $(OBJS)
+$(BIN): $(OBJS)
 	$(CC) $(OBJS) $(LDFLAGS) -o $(BIN)
 
 define CORE_template =
@@ -253,7 +244,7 @@ clean-picoarch:
 	rm -f *.opk
 
 .PHONY: clean
-clean: clean-libpicofe clean-picoarch
+clean: clean-picoarch
 	rm -f $(SOFILES)
 
 .PHONY: clean-all
