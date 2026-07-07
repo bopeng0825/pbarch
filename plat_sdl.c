@@ -1,4 +1,5 @@
 #include <SDL/SDL.h>
+#include <stdlib.h>
 #include <unistd.h>
 #include <sys/time.h>
 #include <stdint.h>
@@ -47,6 +48,28 @@ static unsigned msg_expire = 0;
 
 static bool frame_dirty = false;
 static int frame_time = 1000000 / 60;
+
+#ifdef USE_SDL2
+static void plat_sdl_log_video_drivers(void)
+{
+	int i, count = SDL_GetNumVideoDrivers();
+
+	PA_ERROR("SDL video drivers:");
+	for (i = 0; i < count; i++)
+		PA_ERROR(" %s", SDL_GetVideoDriver(i));
+	PA_ERROR("\n");
+}
+
+static void plat_sdl_set_platform_defaults(void)
+{
+#ifdef SF3000
+	if (!getenv("SDL_VIDEODRIVER"))
+		setenv("SDL_VIDEODRIVER", "fbcon", 0);
+	if (!getenv("SDL_AUDIODRIVER"))
+		setenv("SDL_AUDIODRIVER", "alsa", 0);
+#endif
+}
+#endif
 
 static uint64_t plat_get_ticks_us_u64(void) {
 	uint64_t ret;
@@ -574,8 +597,11 @@ int plat_init(void)
 	plat_sound_write = plat_sound_write_nearest;
 
 #ifdef USE_SDL2
+	plat_sdl_set_platform_defaults();
+
 	if (SDL_Init(SDL_INIT_VIDEO) < 0) {
 		PA_ERROR("%s, failed to init SDL video: %s\n", __func__, SDL_GetError());
+		plat_sdl_log_video_drivers();
 		return -1;
 	}
 
@@ -584,7 +610,11 @@ int plat_init(void)
 	                          SDL_WINDOWPOS_CENTERED,
 	                          SCREEN_WIDTH,
 	                          SCREEN_HEIGHT,
+#ifdef SF3000
+	                          SDL_WINDOW_SHOWN | SDL_WINDOW_FULLSCREEN_DESKTOP);
+#else
 	                          SDL_WINDOW_SHOWN);
+#endif
 	if (!window) {
 		PA_ERROR("%s, failed to create window: %s\n", __func__, SDL_GetError());
 		return -1;
