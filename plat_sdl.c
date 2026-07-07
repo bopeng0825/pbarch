@@ -1,6 +1,7 @@
 #include <SDL/SDL.h>
 #include <unistd.h>
 #include <sys/time.h>
+#include <stdint.h>
 #include "core.h"
 #include "libpicofe/fonts.h"
 #include "libpicofe/plat.h"
@@ -9,7 +10,15 @@
 #include "scale.h"
 #include "util.h"
 
+#ifdef USE_SDL2
+static SDL_Window *window;
+static SDL_Renderer *renderer;
+static SDL_Texture *screen_texture;
+static uint16_t screen_pixels[SCREEN_WIDTH * SCREEN_HEIGHT];
+static SDL_Surface *screen;
+#else
 static SDL_Surface* screen;
+#endif
 
 struct audio_state {
 	unsigned buf_w;
@@ -102,8 +111,16 @@ static int audio_resample_nearest(struct audio_frame data) {
 
 static void *fb_flip(void)
 {
+#ifdef USE_SDL2
+	SDL_UpdateTexture(screen_texture, NULL, screen_pixels, SCREEN_PITCH);
+	SDL_RenderClear(renderer);
+	SDL_RenderCopy(renderer, screen_texture, NULL, NULL);
+	SDL_RenderPresent(renderer);
+	return screen_pixels;
+#else
 	SDL_Flip(screen);
 	return screen->pixels;
+#endif
 }
 
 void *plat_prepare_screenshot(int *w, int *h, int *bpp)
@@ -112,7 +129,11 @@ void *plat_prepare_screenshot(int *w, int *h, int *bpp)
 	if (h) *h = SCREEN_HEIGHT;
 	if (bpp) *bpp = SCREEN_BPP;
 
+#ifdef USE_SDL2
+	return screen_pixels;
+#else
 	return screen->pixels;
+#endif
 }
 
 int plat_dump_screen(const char *filename) {
@@ -151,7 +172,11 @@ int plat_load_screen(const char *filename, void *buf, size_t buf_size, int *w, i
 	if (!imgsurface)
 		goto finish;
 
+#ifdef USE_SDL2
+	surface = SDL_ConvertSurfaceFormat(imgsurface, SDL_PIXELFORMAT_RGB565, 0);
+#else
 	surface = SDL_DisplayFormat(imgsurface);
+#endif
 	if (!surface)
 		goto finish;
 
@@ -182,22 +207,30 @@ void plat_video_menu_enter(int is_rom_loaded)
 	if (g_menuscreen_ptr)
 		return;
 
+#ifdef USE_SDL2
+	memcpy(g_menubg_src_ptr, screen_pixels, g_menubg_src_h * g_menubg_src_pp * sizeof(uint16_t));
+#else
 	SDL_LockSurface(screen);
 	memcpy(g_menubg_src_ptr, screen->pixels, g_menubg_src_h * g_menubg_src_pp * sizeof(uint16_t));
 	SDL_UnlockSurface(screen);
+#endif
 	g_menuscreen_ptr = fb_flip();
 }
 
 void plat_video_menu_begin(void)
 {
+#ifndef USE_SDL2
 	SDL_LockSurface(screen);
+#endif
 	menu_begin();
 }
 
 void plat_video_menu_end(void)
 {
 	menu_end();
+#ifndef USE_SDL2
 	SDL_UnlockSurface(screen);
+#endif
 	g_menuscreen_ptr = fb_flip();
 }
 
@@ -205,6 +238,11 @@ void plat_video_menu_leave(void)
 {
 	memset(g_menubg_src_ptr, 0, g_menuscreen_h * g_menuscreen_pp * sizeof(uint16_t));
 
+#ifdef USE_SDL2
+	memset(screen_pixels, 0, g_menuscreen_h * g_menuscreen_pp * sizeof(uint16_t));
+	fb_flip();
+	memset(screen_pixels, 0, g_menuscreen_h * g_menuscreen_pp * sizeof(uint16_t));
+#else
 	SDL_LockSurface(screen);
 	memset(screen->pixels, 0, g_menuscreen_h * g_menuscreen_pp * sizeof(uint16_t));
 	SDL_UnlockSurface(screen);
@@ -212,6 +250,7 @@ void plat_video_menu_leave(void)
 	SDL_LockSurface(screen);
 	memset(screen->pixels, 0, g_menuscreen_h * g_menuscreen_pp * sizeof(uint16_t));
 	SDL_UnlockSurface(screen);
+#endif
 
 	g_menuscreen_ptr = NULL;
 }
@@ -235,21 +274,32 @@ void plat_video_set_msg(const char *new_msg, unsigned priority, unsigned msec)
 void plat_video_process(const void *data, unsigned width, unsigned height, size_t pitch) {
 	static int had_msg = 0;
 	frame_dirty = true;
+#ifdef USE_SDL2
+	uint16_t *pixels = screen_pixels;
+	unsigned screen_h = SCREEN_HEIGHT;
+	unsigned screen_pitch = SCREEN_WIDTH;
+#else
 	SDL_LockSurface(screen);
+	uint16_t *pixels = screen->pixels;
+	unsigned screen_h = screen->h;
+	unsigned screen_pitch = screen->pitch / SCREEN_BPP;
+#endif
 
 	if (had_msg) {
-		video_clear_msg(screen->pixels, screen->h, screen->pitch / SCREEN_BPP);
+		video_clear_msg(pixels, screen_h, screen_pitch);
 		had_msg = 0;
 	}
 
-	scale(width, height, pitch, data, screen->pixels);
+	scale(width, height, pitch, data, pixels);
 
 	if (msg[0]) {
-		video_print_msg(screen->pixels, screen->h, screen->pitch / SCREEN_BPP, msg);
+		video_print_msg(pixels, screen_h, screen_pitch, msg);
 		had_msg = 1;
 	}
 
+#ifndef USE_SDL2
 	SDL_UnlockSurface(screen);
+#endif
 
 	video_update_msg();
 }
@@ -518,12 +568,65 @@ int plat_init(void)
 {
 	plat_sound_write = plat_sound_write_nearest;
 
+#ifdef USE_SDL2
+	if (SDL_Init(SDL_INIT_VIDEO) < 0) {
+		PA_ERROR("%s, failed to init SDL video: %s\n", __func__, SDL_GetError());
+		return -1;
+	}
+
+	window = SDL_CreateWindow("picoarch",
+	                          SDL_WINDOWPOS_CENTERED,
+	                          SDL_WINDOWPOS_CENTERED,
+	                          SCREEN_WIDTH,
+	                          SCREEN_HEIGHT,
+	                          SDL_WINDOW_SHOWN);
+	if (!window) {
+		PA_ERROR("%s, failed to create window: %s\n", __func__, SDL_GetError());
+		return -1;
+	}
+
+	renderer = SDL_CreateRenderer(window, -1,
+	                              SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
+	if (!renderer) {
+		PA_WARN("%s, accelerated renderer unavailable: %s\n", __func__, SDL_GetError());
+		renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
+	}
+	if (!renderer) {
+		PA_ERROR("%s, failed to create accelerated renderer: %s\n", __func__, SDL_GetError());
+		return -1;
+	}
+
+	SDL_RenderSetLogicalSize(renderer, SCREEN_WIDTH, SCREEN_HEIGHT);
+	SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "nearest");
+
+	screen_texture = SDL_CreateTexture(renderer,
+	                                   SDL_PIXELFORMAT_RGB565,
+	                                   SDL_TEXTUREACCESS_STREAMING,
+	                                   SCREEN_WIDTH,
+	                                   SCREEN_HEIGHT);
+	if (!screen_texture) {
+		PA_ERROR("%s, failed to create screen texture: %s\n", __func__, SDL_GetError());
+		return -1;
+	}
+
+	screen = SDL_CreateRGBSurfaceFrom(screen_pixels,
+	                                  SCREEN_WIDTH,
+	                                  SCREEN_HEIGHT,
+	                                  SCREEN_BPP * 8,
+	                                  SCREEN_PITCH,
+	                                  0xF800, 0x07E0, 0x001F, 0x0000);
+	if (!screen) {
+		PA_ERROR("%s, failed to create screen surface: %s\n", __func__, SDL_GetError());
+		return -1;
+	}
+#else
 	SDL_Init(SDL_INIT_VIDEO);
 	screen = SDL_SetVideoMode(SCREEN_WIDTH, SCREEN_HEIGHT, SCREEN_BPP * 8, SDL_SWSURFACE);
 	if (screen == NULL) {
 		PA_ERROR("%s, failed to set video mode\n", __func__);
 		return -1;
 	}
+#endif
 
 	SDL_ShowCursor(0);
 
@@ -573,7 +676,22 @@ int plat_reinit(void)
 void plat_finish(void)
 {
 	plat_sound_finish();
+#ifdef USE_SDL2
+	if (screen)
+		SDL_FreeSurface(screen);
+	if (screen_texture)
+		SDL_DestroyTexture(screen_texture);
+	if (renderer)
+		SDL_DestroyRenderer(renderer);
+	if (window)
+		SDL_DestroyWindow(window);
+	screen = NULL;
+	screen_texture = NULL;
+	renderer = NULL;
+	window = NULL;
+#else
 	SDL_FreeSurface(screen);
 	screen = NULL;
+#endif
 	SDL_Quit();
 }

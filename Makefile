@@ -14,13 +14,13 @@ BIN       = picoarch
 unexport CFLAGS
 CFLAGS     += -Wall
 CFLAGS     += -fdata-sections -ffunction-sections -DPICO_HOME_DIR='"/.picoarch/"' -flto
-CFLAGS     += -I./ -I./libretro-common/include/ $(shell $(SYSROOT)/usr/bin/sdl-config --cflags)
+CFLAGS     += -I./ -I./libretro-common/include/
 
 # Revision info from repository
 GIT_REVISION ?= $(shell git rev-parse --short HEAD || echo unknown)
 CFLAGS += -DREVISION=\"$(GIT_REVISION)\"
 
-LDFLAGS    = -lc -ldl -lgcc -lm -lSDL -lasound -lpng -lz -Wl,--gc-sections -flto
+LDFLAGS    = -lc -ldl -lgcc -lm -lasound -lpng -lz -Wl,--gc-sections -flto
 
 # Unpolished or slow cores that build
 # EXTRA_CORES += mame2003_plus scummvm
@@ -135,16 +135,22 @@ vitaquake2_TYPES = pak
 
 ifeq ($(platform), trimui)
 	SOURCES += plat_trimui.c
+	CFLAGS += $(shell $(SYSROOT)/usr/bin/sdl-config --cflags)
+	LDFLAGS += -lSDL
 	CFLAGS += -mcpu=arm926ej-s -mtune=arm926ej-s -fno-PIC -DCONTENT_DIR='"/mnt/SDCARD/Roms"'
 	LDFLAGS += -fno-PIC
 else ifeq ($(platform), funkey-s)
 	SOURCES += plat_funkey.c funkey/fk_menu.c funkey/fk_instant_play.c
+	CFLAGS += $(shell $(SYSROOT)/usr/bin/sdl-config --cflags)
+	LDFLAGS += -lSDL
 	CFLAGS += -DCONTENT_DIR='"/mnt"' -DFUNKEY_S
 	LDFLAGS += -fPIC
 	LDFLAGS += -lSDL_image -lSDL_ttf # For fk_menu
 	core_platform = unix-armv7-hardfloat-neon
 else ifeq ($(platform), unix)
 	SOURCES += plat_linux.c
+	CFLAGS += -DUSE_SDL2 $(shell $(SYSROOT)/usr/bin/sdl2-config --cflags)
+	LDFLAGS += $(shell $(SYSROOT)/usr/bin/sdl2-config --libs)
 	LDFLAGS += -fPIE
 endif
 
