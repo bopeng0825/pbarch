@@ -3,8 +3,13 @@
 
 #ifdef FUNKEY_S
 #define SCREEN_WIDTH 240
+#define SCREEN_HEIGHT 240
+#elif defined(SF3000)
+#define SCREEN_WIDTH 640
+#define SCREEN_HEIGHT 480
 #else
 #define SCREEN_WIDTH 320
+#define SCREEN_HEIGHT 240
 #endif
 
 #if SCREEN_WIDTH == 240
@@ -13,7 +18,6 @@
 #define HUD_LEN 41
 #endif
 
-#define SCREEN_HEIGHT 240
 #define SCREEN_BPP 2
 #define SCREEN_PITCH (SCREEN_BPP * SCREEN_WIDTH)
 
