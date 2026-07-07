@@ -140,6 +140,7 @@
 #define SDLK_KP_EQUALS SDL_SCANCODE_KP_EQUALS
 #define SDLK_NUMLOCK SDL_SCANCODE_NUMLOCKCLEAR
 #define SDLK_CAPSLOCK SDL_SCANCODE_CAPSLOCK
+#define SDLK_SCROLLLOCK SDL_SCANCODE_SCROLLLOCK
 #define SDLK_SCROLLOCK SDL_SCANCODE_SCROLLLOCK
 #define SDLK_INSERT SDL_SCANCODE_INSERT
 #define SDLK_HOME SDL_SCANCODE_HOME
@@ -149,6 +150,13 @@
 #define SDLK_PAGEDOWN SDL_SCANCODE_PAGEDOWN
 #define SDLK_PRINT SDL_SCANCODE_PRINTSCREEN
 #define SDLK_PAUSE SDL_SCANCODE_PAUSE
+#define SDLK_RMETA SDL_SCANCODE_RGUI
+#define SDLK_LMETA SDL_SCANCODE_LGUI
+#define SDLK_RGUI SDL_SCANCODE_RGUI
+#define SDLK_LGUI SDL_SCANCODE_LGUI
+#define SDLK_LSUPER SDL_SCANCODE_LGUI
+#define SDLK_RSUPER SDL_SCANCODE_RGUI
+#define SDLK_COMPOSE SDL_SCANCODE_APPLICATION
 #define SDLK_WORLD_0 (SDL_NUM_SCANCODES - 4)
 #define SDLK_WORLD_1 (SDL_NUM_SCANCODES - 3)
 #define SDLK_WORLD_2 (SDL_NUM_SCANCODES - 2)
@@ -166,6 +174,18 @@ static inline int SDL_EnableUNICODE(int enable)
 	(void)enable;
 	return 0;
 }
+
+static inline Uint8 *SDL_GetKeyState_compat(int *numkeys)
+{
+	return (Uint8 *)SDL_GetKeyboardState(numkeys);
+}
+#define SDL_GetKeyState(numkeys) SDL_GetKeyState_compat(numkeys)
+
+static inline const char *SDL_JoystickName_compat(int index)
+{
+	return SDL_JoystickNameForIndex(index);
+}
+#define SDL_JoystickName(index) SDL_JoystickName_compat(index)
 
 static inline void SDL_KeycodeToScancodeCompat(SDL_Event *event)
 {
