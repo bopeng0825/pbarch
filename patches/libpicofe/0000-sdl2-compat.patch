@@ -1,0 +1,70 @@
+diff --git a/in_sdl.c b/in_sdl.c
+index a84c781..1111111 100644
+--- a/in_sdl.c
++++ b/in_sdl.c
+@@ -1,4 +1,4 @@
+-#include <SDL/SDL.h>
++#include <SDL/SDL.h>
+ #include <string.h>
+ #include <stdio.h>
+ #include <stdlib.h>
+@@ -13,6 +13,63 @@
+ #include "input.h"
+ #include "plat.h"
+ 
++#ifdef USE_SDL2
++#ifndef SDLK_LAST
++#define SDLK_LAST SDL_NUM_SCANCODES
++#endif
++#ifndef SDL_KEYDOWNMASK
++#define SDL_KEYDOWNMASK SDL_EVENTMASK(SDL_KEYDOWN)
++#endif
++#ifndef SDL_KEYUPMASK
++#define SDL_KEYUPMASK SDL_EVENTMASK(SDL_KEYUP)
++#endif
++#ifndef SDL_JOYAXISMOTIONMASK
++#define SDL_JOYAXISMOTIONMASK SDL_EVENTMASK(SDL_JOYAXISMOTION)
++#endif
++#ifndef SDL_JOYBALLMOTIONMASK
++#define SDL_JOYBALLMOTIONMASK SDL_EVENTMASK(SDL_JOYBALLMOTION)
++#endif
++#ifndef SDL_JOYHATMOTIONMASK
++#define SDL_JOYHATMOTIONMASK SDL_EVENTMASK(SDL_JOYHATMOTION)
++#endif
++#ifndef SDL_JOYBUTTONDOWNMASK
++#define SDL_JOYBUTTONDOWNMASK SDL_EVENTMASK(SDL_JOYBUTTONDOWN)
++#endif
++#ifndef SDL_JOYBUTTONUPMASK
++#define SDL_JOYBUTTONUPMASK SDL_EVENTMASK(SDL_JOYBUTTONUP)
++#endif
++#ifndef SDL_ALLEVENTS
++#define SDL_ALLEVENTS 0xffffffffu
++#endif
++#define SDL_JoystickName(index) SDL_JoystickNameForIndex(index)
++#define SDL_PeepEvents(events, numevents, action, mask) \
++	SDL_PeepEvents((events), (numevents), (action), SDL_FIRSTEVENT, SDL_LASTEVENT)
++#define SDLK_KP0 SDL_SCANCODE_KP_0
++#define SDLK_KP1 SDL_SCANCODE_KP_1
++#define SDLK_KP2 SDL_SCANCODE_KP_2
++#define SDLK_KP3 SDL_SCANCODE_KP_3
++#define SDLK_KP4 SDL_SCANCODE_KP_4
++#define SDLK_KP5 SDL_SCANCODE_KP_5
++#define SDLK_KP6 SDL_SCANCODE_KP_6
++#define SDLK_KP7 SDL_SCANCODE_KP_7
++#define SDLK_KP8 SDL_SCANCODE_KP_8
++#define SDLK_KP9 SDL_SCANCODE_KP_9
++#define SDLK_NUMLOCK SDL_SCANCODE_NUMLOCKCLEAR
++#define SDLK_SCROLLOCK SDL_SCANCODE_SCROLLLOCK
++#define SDLK_RMETA SDL_SCANCODE_RGUI
++#define SDLK_LMETA SDL_SCANCODE_LGUI
++#define SDLK_LSUPER SDL_SCANCODE_LGUI
++#define SDLK_RSUPER SDL_SCANCODE_RGUI
++#define SDLK_COMPOSE SDL_SCANCODE_APPLICATION
++#define SDLK_WORLD_0 (SDL_NUM_SCANCODES - 4)
++#define SDLK_WORLD_1 (SDL_NUM_SCANCODES - 3)
++#define SDLK_WORLD_2 (SDL_NUM_SCANCODES - 2)
++#define SDLK_WORLD_3 (SDL_NUM_SCANCODES - 1)
++#endif
++
+ typedef unsigned long keybits_t;
+ #define KEYBITS_WORD_BITS (sizeof(keybits_t) * 8)
