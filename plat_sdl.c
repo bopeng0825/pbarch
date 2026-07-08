@@ -20,6 +20,7 @@ static SDL_Texture *screen_texture;
 static SDL_Texture *screen_copy_texture;
 static SDL_Rect screen_src_rect;
 static SDL_Rect screen_dst_rect;
+static Uint32 screen_tex_format;
 static unsigned screen_tex_w;
 static unsigned screen_tex_h;
 static size_t screen_tex_pitch;
@@ -27,6 +28,10 @@ static bool screen_texture_ready;
 static bool screen_texture_linear;
 static bool screen_use_hw_scaling;
 static bool screen_hw_msg_pending;
+static bool screen_renderer_vsync;
+static unsigned screen_last_log_w;
+static unsigned screen_last_log_h;
+static size_t screen_last_log_pitch;
 static uint16_t screen_pixels[SCREEN_WIDTH * SCREEN_HEIGHT];
 static SDL_Surface *screen;
 #else
@@ -129,11 +134,17 @@ static bool plat_sdl_is_hw_scale_supported(unsigned width, unsigned height, size
 	if (width == 0 || height == 0 || pitch == 0)
 		return false;
 
-	/* This path only supports the core's native RGB565 frame layout. */
-	if (pitch != width * sizeof(uint16_t))
+	if (pitch != width * sizeof(uint16_t) &&
+	    pitch != width * sizeof(uint32_t))
 		return false;
 
 	return true;
+}
+
+static Uint32 plat_sdl_texture_format_for_pitch(unsigned width, size_t pitch)
+{
+	return (pitch == width * sizeof(uint32_t)) ?
+		SDL_PIXELFORMAT_XRGB8888 : SDL_PIXELFORMAT_RGB565;
 }
 
 static void plat_sdl_compute_hw_rects(unsigned width, unsigned height,
@@ -301,6 +312,7 @@ static void plat_sdl_destroy_screen_texture(void)
 		screen_texture = NULL;
 	}
 	screen_texture_ready = false;
+	screen_tex_format = 0;
 	screen_tex_w = 0;
 	screen_tex_h = 0;
 	screen_tex_pitch = 0;
@@ -315,9 +327,10 @@ static void plat_sdl_destroy_screen_copy_texture(void)
 }
 
 static int plat_sdl_ensure_screen_texture(unsigned width, unsigned height,
-					  size_t pitch, bool linear)
+					  size_t pitch, Uint32 format, bool linear)
 {
 	if (screen_texture &&
+	    screen_tex_format == format &&
 	    screen_tex_w == width &&
 	    screen_tex_h == height &&
 	    screen_tex_pitch == pitch &&
@@ -329,7 +342,7 @@ static int plat_sdl_ensure_screen_texture(unsigned width, unsigned height,
 
 	SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, linear ? "linear" : "nearest");
 	screen_texture = SDL_CreateTexture(renderer,
-					   SDL_PIXELFORMAT_RGB565,
+					   format,
 					   SDL_TEXTUREACCESS_STREAMING,
 					   width,
 					   height);
@@ -339,6 +352,7 @@ static int plat_sdl_ensure_screen_texture(unsigned width, unsigned height,
 		return -1;
 	}
 
+	screen_tex_format = format;
 	screen_tex_w = width;
 	screen_tex_h = height;
 	screen_tex_pitch = pitch;
@@ -412,7 +426,7 @@ static void *fb_flip(void)
 	if (!screen_texture_ready)
 		return screen_pixels;
 
-	if (!screen_use_hw_scaling || screen_hw_msg_pending)
+	if (!screen_use_hw_scaling)
 		SDL_UpdateTexture(screen_texture, NULL, screen_pixels, SCREEN_PITCH);
 
 	SDL_RenderClear(renderer);
@@ -595,6 +609,7 @@ void plat_video_process(const void *data, unsigned width, unsigned height, size_
 	unsigned screen_pitch = SCREEN_WIDTH;
 	bool want_hw_scaling = plat_sdl_is_hw_scale_supported(width, height, pitch);
 	bool want_linear = (scale_filter != SCALE_FILTER_NEAREST);
+	Uint32 texture_format = plat_sdl_texture_format_for_pitch(width, pitch);
 #else
 	SDL_LockSurface(screen);
 	uint16_t *pixels = screen->pixels;
@@ -609,16 +624,28 @@ void plat_video_process(const void *data, unsigned width, unsigned height, size_
 
 #ifdef USE_SDL2
 	if (want_hw_scaling) {
-		if (plat_sdl_ensure_screen_texture(width, height, pitch, want_linear) == 0) {
+		if (plat_sdl_ensure_screen_texture(width, height, pitch, texture_format, want_linear) == 0) {
 			plat_sdl_compute_hw_rects(width, height, &screen_src_rect, &screen_dst_rect);
 			SDL_UpdateTexture(screen_texture, NULL, data, (int)pitch);
 			screen_use_hw_scaling = true;
+			if (screen_last_log_w != width ||
+			    screen_last_log_h != height ||
+			    screen_last_log_pitch != pitch) {
+				PA_INFO("SDL HW video: %ux%u pitch=%zu format=%s src=%dx%d+%d+%d dst=%dx%d+%d+%d\n",
+					width, height, pitch,
+					texture_format == SDL_PIXELFORMAT_XRGB8888 ? "XRGB8888" : "RGB565",
+					screen_src_rect.w, screen_src_rect.h, screen_src_rect.x, screen_src_rect.y,
+					screen_dst_rect.w, screen_dst_rect.h, screen_dst_rect.x, screen_dst_rect.y);
+				screen_last_log_w = width;
+				screen_last_log_h = height;
+				screen_last_log_pitch = pitch;
+			}
 		} else {
 			screen_use_hw_scaling = false;
 			scale(width, height, pitch, data, pixels);
 		}
 	} else {
-		if (plat_sdl_ensure_screen_texture(SCREEN_WIDTH, SCREEN_HEIGHT, SCREEN_PITCH, false) == 0)
+		if (plat_sdl_ensure_screen_texture(SCREEN_WIDTH, SCREEN_HEIGHT, SCREEN_PITCH, SDL_PIXELFORMAT_RGB565, false) == 0)
 			screen_use_hw_scaling = false;
 		scale(width, height, pitch, data, pixels);
 	}
@@ -656,7 +683,7 @@ void plat_video_flip(void)
 	static uint64_t next_frame_time_us = 0;
 
 	if (frame_dirty) {
-		if (enable_drc) {
+		if (enable_drc && !screen_renderer_vsync) {
 			uint64_t time = plat_get_ticks_us_u64();
 
 			if (limit_frames && time < next_frame_time_us) {
@@ -944,6 +971,7 @@ int plat_init(void)
 		return -1;
 	}
 
+	screen_renderer_vsync = false;
 	SDL_SetHint(SDL_HINT_RENDER_VSYNC, "0");
 	renderer = SDL_CreateRenderer(window, -1,
 	                              SDL_RENDERER_ACCELERATED);
@@ -965,6 +993,9 @@ int plat_init(void)
 				(info.flags & SDL_RENDERER_ACCELERATED) ? " accelerated" : "",
 				(info.flags & SDL_RENDERER_SOFTWARE) ? " software" : "",
 				(info.flags & SDL_RENDERER_PRESENTVSYNC) ? " vsync" : "");
+			screen_renderer_vsync = !!(info.flags & SDL_RENDERER_PRESENTVSYNC);
+			if (screen_renderer_vsync)
+				PA_INFO("SDL renderer vsync active; skipping manual frame delay\n");
 		}
 	}
 
@@ -973,9 +1004,13 @@ int plat_init(void)
 	screen_texture_linear = false;
 	screen_use_hw_scaling = false;
 	screen_hw_msg_pending = false;
+	screen_tex_format = 0;
 	screen_tex_w = 0;
 	screen_tex_h = 0;
 	screen_tex_pitch = 0;
+	screen_last_log_w = 0;
+	screen_last_log_h = 0;
+	screen_last_log_pitch = 0;
 	screen_copy_texture = NULL;
 
 	screen = SDL_CreateRGBSurfaceFrom(screen_pixels,

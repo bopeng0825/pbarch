@@ -56,6 +56,10 @@ void video_process(const void *data, unsigned width, unsigned height, size_t pit
 	if (screen_def.pixel_format != RETRO_PIXEL_FORMAT_XRGB8888)
 		return plat_video_process(data, width, height, pitch);
 
+#ifdef USE_SDL2
+	return plat_video_process(data, width, height, pitch);
+#endif
+
 	for (int y = 0; y < height; y++) {
 		for (int x = 0; x < width; x++) {
 			*output =  (*input & 0xF80000) >> 8;
