@@ -1,4 +1,5 @@
 #include <SDL/SDL.h>
+#include <math.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <sys/time.h>
@@ -7,6 +8,7 @@
 #include "libpicofe/fonts.h"
 #include "libpicofe/plat.h"
 #include "menu.h"
+#include "options.h"
 #include "plat.h"
 #include "scale.h"
 #include "util.h"
@@ -15,6 +17,16 @@
 static SDL_Window *window;
 static SDL_Renderer *renderer;
 static SDL_Texture *screen_texture;
+static SDL_Texture *screen_copy_texture;
+static SDL_Rect screen_src_rect;
+static SDL_Rect screen_dst_rect;
+static unsigned screen_tex_w;
+static unsigned screen_tex_h;
+static size_t screen_tex_pitch;
+static bool screen_texture_ready;
+static bool screen_texture_linear;
+static bool screen_use_hw_scaling;
+static bool screen_hw_msg_pending;
 static uint16_t screen_pixels[SCREEN_WIDTH * SCREEN_HEIGHT];
 static SDL_Surface *screen;
 #else
@@ -108,6 +120,266 @@ static void video_print_msg(uint16_t *dst, uint32_t h, uint32_t pitch, char *msg
 	basic_text_out16_nf(dst, pitch, 2, h - 10, msg);
 }
 
+#ifdef USE_SDL2
+static bool plat_sdl_is_hw_scale_supported(unsigned width, unsigned height, size_t pitch)
+{
+	if (rotate_display)
+		return false;
+
+	if (width == 0 || height == 0 || pitch == 0)
+		return false;
+
+	/* This path only supports the core's native RGB565 frame layout. */
+	if (pitch != width * sizeof(uint16_t))
+		return false;
+
+	return true;
+}
+
+static void plat_sdl_compute_hw_rects(unsigned width, unsigned height,
+				      SDL_Rect *src, SDL_Rect *dst)
+{
+	double aspect = (double)width / (double)height;
+	int src_x = 0;
+	int src_y = 0;
+	int src_w = (int)width;
+	int src_h = (int)height;
+	int dst_x = 0;
+	int dst_y = 0;
+	int dst_w = SCREEN_WIDTH;
+	int dst_h = SCREEN_HEIGHT;
+
+	if (width == 384 && height == 224) {
+		aspect = 10.0 / 7.0;
+	} else if (strstr(core_name, "pcsx")) {
+		aspect = 4.0 / 3.0;
+	} else if (strstr(core_name, "snes")) {
+		aspect = 8.0 / 7.0;
+	}
+
+	switch (scale_size) {
+	case SCALE_SIZE_NATIVE:
+		dst_w = (int)width;
+		dst_h = (int)height;
+		dst_x = (SCREEN_WIDTH - dst_w) / 2;
+		dst_y = (SCREEN_HEIGHT - dst_h) / 2;
+		if (dst_y < 0) {
+			src_h = (int)((double)height * (double)SCREEN_HEIGHT / (double)dst_h);
+			if (src_h < 1)
+				src_h = 1;
+			src_y = ((int)height - src_h) / 2;
+			dst_y = 0;
+			dst_h = SCREEN_HEIGHT;
+		}
+		if (dst_x < 0) {
+			src_w = (int)((double)width * (double)SCREEN_WIDTH / (double)dst_w);
+			if (src_w < 1)
+				src_w = 1;
+			if (pan_display == PAN_DISPLAY_LEFT) {
+				src_x = 0;
+			} else if (pan_display == PAN_DISPLAY_RIGHT) {
+				src_x = (int)width - src_w;
+			} else {
+				src_x = ((int)width - src_w) / 2;
+			}
+			dst_x = 0;
+			dst_w = SCREEN_WIDTH;
+		}
+		break;
+	case SCALE_SIZE_STRETCHED:
+		dst_x = 0;
+		dst_y = 0;
+		dst_w = SCREEN_WIDTH;
+		dst_h = SCREEN_HEIGHT;
+		break;
+	case SCALE_SIZE_SCALED:
+		dst_w = SCREEN_WIDTH;
+		dst_h = (int)lround((double)SCREEN_WIDTH / aspect);
+		dst_x = 0;
+		dst_y = (SCREEN_HEIGHT - dst_h) / 2;
+		if (dst_h > SCREEN_HEIGHT) {
+			dst_h = SCREEN_HEIGHT;
+			dst_w = (int)lround((double)SCREEN_HEIGHT * aspect);
+			dst_x = (SCREEN_WIDTH - dst_w) / 2;
+			dst_y = 0;
+		}
+		break;
+	case SCALE_SIZE_CROPPED:
+	case SCALE_SIZE_MANUAL:
+	{
+		double zoom = (scale_size == SCALE_SIZE_CROPPED) ? 1.0 : ((double)zoom_level / 100.0);
+		unsigned base_w = width;
+		unsigned base_h = height;
+		unsigned full_crop_h = SCREEN_HEIGHT;
+		unsigned full_crop_w;
+
+		if (width > 240) {
+			base_w = SCREEN_WIDTH;
+			base_h = (unsigned)lround((double)SCREEN_WIDTH / aspect);
+			if (base_h > SCREEN_HEIGHT) {
+				base_h = SCREEN_HEIGHT;
+				base_w = (unsigned)lround((double)SCREEN_HEIGHT * aspect);
+			}
+		}
+
+		full_crop_w = (unsigned)lround((double)full_crop_h * aspect);
+		dst_w = (int)lround((double)base_w + ((double)full_crop_w - (double)base_w) * zoom);
+		dst_h = (int)lround((double)base_h + ((double)full_crop_h - (double)base_h) * zoom);
+		if (dst_w < 1)
+			dst_w = 1;
+		if (dst_h < 1)
+			dst_h = 1;
+
+		if (dst_w > SCREEN_WIDTH) {
+			double src_pixels_per_virtual = (double)width / (double)dst_w;
+			src_w = (int)lround((double)SCREEN_WIDTH * src_pixels_per_virtual);
+			if (src_w < 1)
+				src_w = 1;
+			if (src_w > (int)width)
+				src_w = (int)width;
+
+			if (pan_display == PAN_DISPLAY_LEFT) {
+				src_x = 0;
+			} else if (pan_display == PAN_DISPLAY_RIGHT) {
+				src_x = (int)width - src_w;
+			} else {
+				src_x = ((int)width - src_w) / 2;
+			}
+
+			dst_x = 0;
+			dst_w = SCREEN_WIDTH;
+		} else {
+			dst_x = (SCREEN_WIDTH - dst_w) / 2;
+		}
+
+		if (dst_h > SCREEN_HEIGHT) {
+			double src_pixels_per_virtual_y = (double)height / (double)dst_h;
+			src_h = (int)lround((double)SCREEN_HEIGHT * src_pixels_per_virtual_y);
+			if (src_h < 1)
+				src_h = 1;
+			if (src_h > (int)height)
+				src_h = (int)height;
+			src_y = ((int)height - src_h) / 2;
+			dst_y = 0;
+			dst_h = SCREEN_HEIGHT;
+		} else {
+			dst_y = (SCREEN_HEIGHT - dst_h) / 2;
+		}
+		break;
+	}
+	default:
+		break;
+	}
+
+	if (src_x < 0)
+		src_x = 0;
+	if (src_y < 0)
+		src_y = 0;
+	if (src_x + src_w > (int)width)
+		src_w = (int)width - src_x;
+	if (src_y + src_h > (int)height)
+		src_h = (int)height - src_y;
+	if (dst_w < 1)
+		dst_w = 1;
+	if (dst_h < 1)
+		dst_h = 1;
+
+	src->x = src_x;
+	src->y = src_y;
+	src->w = src_w;
+	src->h = src_h;
+	dst->x = dst_x;
+	dst->y = dst_y;
+	dst->w = dst_w;
+	dst->h = dst_h;
+}
+
+static void plat_sdl_destroy_screen_texture(void)
+{
+	if (screen_texture) {
+		SDL_DestroyTexture(screen_texture);
+		screen_texture = NULL;
+	}
+	screen_texture_ready = false;
+	screen_tex_w = 0;
+	screen_tex_h = 0;
+	screen_tex_pitch = 0;
+}
+
+static void plat_sdl_destroy_screen_copy_texture(void)
+{
+	if (screen_copy_texture) {
+		SDL_DestroyTexture(screen_copy_texture);
+		screen_copy_texture = NULL;
+	}
+}
+
+static int plat_sdl_ensure_screen_texture(unsigned width, unsigned height,
+					  size_t pitch, bool linear)
+{
+	if (screen_texture &&
+	    screen_tex_w == width &&
+	    screen_tex_h == height &&
+	    screen_tex_pitch == pitch &&
+	    screen_texture_linear == linear) {
+		return 0;
+	}
+
+	plat_sdl_destroy_screen_texture();
+
+	SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, linear ? "linear" : "nearest");
+	screen_texture = SDL_CreateTexture(renderer,
+					   SDL_PIXELFORMAT_RGB565,
+					   SDL_TEXTUREACCESS_STREAMING,
+					   width,
+					   height);
+	if (!screen_texture) {
+		PA_ERROR("%s, failed to create screen texture %ux%u: %s\n",
+			 __func__, width, height, SDL_GetError());
+		return -1;
+	}
+
+	screen_tex_w = width;
+	screen_tex_h = height;
+	screen_tex_pitch = pitch;
+	screen_texture_linear = linear;
+	screen_texture_ready = true;
+	return 0;
+}
+
+static int plat_sdl_ensure_screen_copy_texture(void)
+{
+	if (screen_copy_texture)
+		return 0;
+
+	SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "nearest");
+	screen_copy_texture = SDL_CreateTexture(renderer,
+						SDL_PIXELFORMAT_RGB565,
+						SDL_TEXTUREACCESS_STREAMING,
+						SCREEN_WIDTH,
+						SCREEN_HEIGHT);
+	if (!screen_copy_texture) {
+		PA_ERROR("%s, failed to create screen copy texture: %s\n",
+			 __func__, SDL_GetError());
+		return -1;
+	}
+
+	return 0;
+}
+
+static void plat_sdl_readback_screen(void)
+{
+	if (!renderer)
+		return;
+
+	if (SDL_RenderReadPixels(renderer, NULL, SDL_PIXELFORMAT_RGB565,
+				 screen_pixels, SCREEN_PITCH) != 0) {
+		PA_WARN("%s, SDL_RenderReadPixels failed: %s\n",
+			__func__, SDL_GetError());
+	}
+}
+#endif
+
 static int audio_resample_passthrough(struct audio_frame data) {
 	audio.buf[audio.buf_w++] = data;
 	if (audio.buf_w >= audio.buf_len) audio.buf_w = 0;
@@ -137,9 +409,21 @@ static int audio_resample_nearest(struct audio_frame data) {
 static void *fb_flip(void)
 {
 #ifdef USE_SDL2
-	SDL_UpdateTexture(screen_texture, NULL, screen_pixels, SCREEN_PITCH);
+	if (!screen_texture_ready)
+		return screen_pixels;
+
+	if (!screen_use_hw_scaling || screen_hw_msg_pending)
+		SDL_UpdateTexture(screen_texture, NULL, screen_pixels, SCREEN_PITCH);
+
 	SDL_RenderClear(renderer);
-	SDL_RenderCopy(renderer, screen_texture, NULL, NULL);
+	if (screen_hw_msg_pending) {
+		SDL_RenderCopy(renderer, screen_copy_texture, NULL, NULL);
+		screen_hw_msg_pending = false;
+	} else {
+		SDL_RenderCopy(renderer, screen_texture,
+			      screen_use_hw_scaling ? &screen_src_rect : NULL,
+			      screen_use_hw_scaling ? &screen_dst_rect : NULL);
+	}
 	SDL_RenderPresent(renderer);
 	return screen_pixels;
 #else
@@ -180,6 +464,10 @@ int plat_dump_screen(const char *filename) {
 			SDL_FreeSurface(surface);
 		}
 	} else {
+#ifdef USE_SDL2
+		if (screen_use_hw_scaling)
+			plat_sdl_readback_screen();
+#endif
 		ret = SDL_SaveBMP(screen, imgname);
 	}
 
@@ -233,6 +521,8 @@ void plat_video_menu_enter(int is_rom_loaded)
 		return;
 
 #ifdef USE_SDL2
+	if (screen_use_hw_scaling)
+		plat_sdl_readback_screen();
 	memcpy(g_menubg_src_ptr, screen_pixels, g_menubg_src_h * g_menubg_src_pp * sizeof(uint16_t));
 #else
 	SDL_LockSurface(screen);
@@ -303,6 +593,8 @@ void plat_video_process(const void *data, unsigned width, unsigned height, size_
 	uint16_t *pixels = screen_pixels;
 	unsigned screen_h = SCREEN_HEIGHT;
 	unsigned screen_pitch = SCREEN_WIDTH;
+	bool want_hw_scaling = plat_sdl_is_hw_scale_supported(width, height, pitch);
+	bool want_linear = (scale_filter != SCALE_FILTER_NEAREST);
 #else
 	SDL_LockSurface(screen);
 	uint16_t *pixels = screen->pixels;
@@ -315,9 +607,39 @@ void plat_video_process(const void *data, unsigned width, unsigned height, size_
 		had_msg = 0;
 	}
 
+#ifdef USE_SDL2
+	if (want_hw_scaling) {
+		if (plat_sdl_ensure_screen_texture(width, height, pitch, want_linear) == 0) {
+			plat_sdl_compute_hw_rects(width, height, &screen_src_rect, &screen_dst_rect);
+			SDL_UpdateTexture(screen_texture, NULL, data, (int)pitch);
+			screen_use_hw_scaling = true;
+		} else {
+			screen_use_hw_scaling = false;
+			scale(width, height, pitch, data, pixels);
+		}
+	} else {
+		if (plat_sdl_ensure_screen_texture(SCREEN_WIDTH, SCREEN_HEIGHT, SCREEN_PITCH, false) == 0)
+			screen_use_hw_scaling = false;
+		scale(width, height, pitch, data, pixels);
+	}
+#else
 	scale(width, height, pitch, data, pixels);
+#endif
 
 	if (msg[0]) {
+		if (screen_use_hw_scaling) {
+			if (plat_sdl_ensure_screen_copy_texture() == 0) {
+				SDL_RenderClear(renderer);
+				SDL_RenderCopy(renderer, screen_texture, &screen_src_rect, &screen_dst_rect);
+				plat_sdl_readback_screen();
+				video_print_msg(pixels, screen_h, screen_pitch, msg);
+				SDL_UpdateTexture(screen_copy_texture, NULL, screen_pixels, SCREEN_PITCH);
+				screen_hw_msg_pending = true;
+				had_msg = 1;
+				video_update_msg();
+				return;
+			}
+		}
 		video_print_msg(pixels, screen_h, screen_pitch, msg);
 		had_msg = 1;
 	}
@@ -622,6 +944,7 @@ int plat_init(void)
 		return -1;
 	}
 
+	SDL_SetHint(SDL_HINT_RENDER_VSYNC, "0");
 	renderer = SDL_CreateRenderer(window, -1,
 	                              SDL_RENDERER_ACCELERATED);
 	if (!renderer) {
@@ -635,6 +958,8 @@ int plat_init(void)
 	{
 		SDL_RendererInfo info;
 		if (SDL_GetRendererInfo(renderer, &info) == 0) {
+			PA_INFO("SDL video driver: %s\n",
+				SDL_GetCurrentVideoDriver() ? SDL_GetCurrentVideoDriver() : "unknown");
 			PA_INFO("SDL renderer: %s%s%s%s\n",
 				info.name ? info.name : "unknown",
 				(info.flags & SDL_RENDERER_ACCELERATED) ? " accelerated" : "",
@@ -643,18 +968,15 @@ int plat_init(void)
 		}
 	}
 
-	SDL_RenderSetLogicalSize(renderer, SCREEN_WIDTH, SCREEN_HEIGHT);
-	SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "nearest");
-
-	screen_texture = SDL_CreateTexture(renderer,
-	                                   SDL_PIXELFORMAT_RGB565,
-	                                   SDL_TEXTUREACCESS_STREAMING,
-	                                   SCREEN_WIDTH,
-	                                   SCREEN_HEIGHT);
-	if (!screen_texture) {
-		PA_ERROR("%s, failed to create screen texture: %s\n", __func__, SDL_GetError());
-		return -1;
-	}
+	screen_texture = NULL;
+	screen_texture_ready = false;
+	screen_texture_linear = false;
+	screen_use_hw_scaling = false;
+	screen_hw_msg_pending = false;
+	screen_tex_w = 0;
+	screen_tex_h = 0;
+	screen_tex_pitch = 0;
+	screen_copy_texture = NULL;
 
 	screen = SDL_CreateRGBSurfaceFrom(screen_pixels,
 	                                  SCREEN_WIDTH,
@@ -726,8 +1048,8 @@ void plat_finish(void)
 #ifdef USE_SDL2
 	if (screen)
 		SDL_FreeSurface(screen);
-	if (screen_texture)
-		SDL_DestroyTexture(screen_texture);
+	plat_sdl_destroy_screen_texture();
+	plat_sdl_destroy_screen_copy_texture();
 	if (renderer)
 		SDL_DestroyRenderer(renderer);
 	if (window)
