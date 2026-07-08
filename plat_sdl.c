@@ -64,7 +64,9 @@ static void plat_sdl_set_platform_defaults(void)
 {
 #ifdef SF3000
 	if (!getenv("SDL_VIDEODRIVER"))
-		setenv("SDL_VIDEODRIVER", "fbcon", 0);
+		setenv("SDL_VIDEODRIVER", "fb_hcge", 0);
+	if (!getenv("SDL_RENDER_DRIVER"))
+		setenv("SDL_RENDER_DRIVER", "fb_hcge", 0);
 	if (!getenv("SDL_AUDIODRIVER"))
 		setenv("SDL_AUDIODRIVER", "alsa", 0);
 #endif
@@ -621,7 +623,7 @@ int plat_init(void)
 	}
 
 	renderer = SDL_CreateRenderer(window, -1,
-	                              SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
+	                              SDL_RENDERER_ACCELERATED);
 	if (!renderer) {
 		PA_WARN("%s, accelerated renderer unavailable: %s\n", __func__, SDL_GetError());
 		renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
@@ -629,6 +631,16 @@ int plat_init(void)
 	if (!renderer) {
 		PA_ERROR("%s, failed to create accelerated renderer: %s\n", __func__, SDL_GetError());
 		return -1;
+	}
+	{
+		SDL_RendererInfo info;
+		if (SDL_GetRendererInfo(renderer, &info) == 0) {
+			PA_INFO("SDL renderer: %s%s%s%s\n",
+				info.name ? info.name : "unknown",
+				(info.flags & SDL_RENDERER_ACCELERATED) ? " accelerated" : "",
+				(info.flags & SDL_RENDERER_SOFTWARE) ? " software" : "",
+				(info.flags & SDL_RENDERER_PRESENTVSYNC) ? " vsync" : "");
+		}
 	}
 
 	SDL_RenderSetLogicalSize(renderer, SCREEN_WIDTH, SCREEN_HEIGHT);
