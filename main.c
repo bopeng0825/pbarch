@@ -1,4 +1,5 @@
 #include <png.h>
+#include <signal.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <string.h>
@@ -36,6 +37,7 @@ int config_override = 0;
 int resume_slot = -1;
 static int last_screenshot = 0;
 static emu_action eaction = EACTION_NONE;
+static volatile sig_atomic_t signal_quit_requested = 0;
 
 static uint32_t vsyncs;
 static uint32_t renders;
@@ -102,6 +104,22 @@ static void loop_profile_frame(unsigned adjust_us, unsigned core_us,
 		memset(&loop_profile, 0, sizeof(loop_profile));
 		loop_profile.last_log_us = now;
 	}
+}
+
+static void handle_signal_quit(int sig)
+{
+	if (signal_quit_requested) {
+		_exit(128 + sig);
+	}
+
+	signal_quit_requested = sig;
+	should_quit = true;
+}
+
+static void install_signal_handlers(void)
+{
+	signal(SIGINT, handle_signal_quit);
+	signal(SIGTERM, handle_signal_quit);
 }
 
 static void toggle_fast_forward(int force_off)
@@ -726,6 +744,8 @@ int main(int argc, char **argv) {
 	const struct core_override *override;
 	int defer_frames = 0;
 
+	install_signal_handlers();
+
 	if (argc > 1) {
 		if (!strcmp(argv[1], "-h") || !strcmp(argv[1], "--help")) {
 			printf("Usage: picoarch [libretro_core [content]]\n");
@@ -821,6 +841,9 @@ int main(int argc, char **argv) {
 
 	do {
 		unsigned t0, t1, t2, t3, t4;
+
+		if (signal_quit_requested)
+			should_quit = true;
 
 		count_fps();
 		t0 = plat_get_ticks_us();

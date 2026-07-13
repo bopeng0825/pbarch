@@ -18,7 +18,6 @@
 static SDL_Window *window;
 static SDL_Renderer *renderer;
 static SDL_Texture *screen_texture;
-static SDL_Texture *screen_copy_texture;
 static SDL_Rect screen_src_rect;
 static SDL_Rect screen_dst_rect;
 static Uint32 screen_tex_format;
@@ -28,7 +27,6 @@ static size_t screen_tex_pitch;
 static bool screen_texture_ready;
 static bool screen_texture_linear;
 static bool screen_use_hw_scaling;
-static bool screen_hw_msg_pending;
 static bool screen_renderer_vsync;
 static unsigned screen_clear_frames;
 static bool screen_last_dst_rect_valid;
@@ -37,6 +35,11 @@ static unsigned screen_last_log_w;
 static unsigned screen_last_log_h;
 static size_t screen_last_log_pitch;
 static uint16_t screen_pixels[SCREEN_WIDTH * SCREEN_HEIGHT];
+static uint16_t *hud_frame_pixels;
+static size_t hud_frame_pixels_len;
+static unsigned hud_frame_width;
+static unsigned hud_frame_height;
+static size_t hud_frame_pitch;
 static SDL_Surface *screen;
 
 struct sdl_video_profile {
@@ -212,6 +215,45 @@ static void video_print_msg(uint16_t *dst, uint32_t h, uint32_t pitch, char *msg
 	basic_text_out16_nf(dst, pitch, 2, h - 10, msg);
 }
 
+#ifdef USE_SDL2
+static void video_print_msg_aligned(uint16_t *dst, uint32_t h, uint32_t pitch, char *msg)
+{
+	char left[HUD_LEN];
+	char right[HUD_LEN];
+	size_t len = strnlen(msg, HUD_LEN - 1);
+	size_t end = len;
+	size_t right_start;
+	size_t left_end;
+
+	while (end > 0 && msg[end - 1] == ' ')
+		end--;
+	if (end == 0) {
+		return;
+	}
+
+	right_start = end;
+	while (right_start > 0 && msg[right_start - 1] != ' ')
+		right_start--;
+	left_end = right_start;
+	while (left_end > 0 && msg[left_end - 1] == ' ')
+		left_end--;
+
+	if (left_end > 0 && right_start > left_end + 1) {
+		size_t right_len = end - right_start;
+		int right_x = (int)pitch - (int)right_len * 8 - 2;
+
+		memcpy(left, msg, left_end);
+		left[left_end] = '\0';
+		memcpy(right, msg + right_start, right_len);
+		right[right_len] = '\0';
+
+		basic_text_out16_nf(dst, pitch, 2, h - 10, left);
+		basic_text_out16_nf(dst, pitch, right_x > 2 ? right_x : 2, h - 10, right);
+	} else {
+		video_print_msg(dst, h, pitch, msg);
+	}
+}
+#endif
 #ifdef USE_SDL2
 static bool plat_sdl_is_hw_scale_supported(unsigned width, unsigned height, size_t pitch)
 {
@@ -405,14 +447,6 @@ static void plat_sdl_destroy_screen_texture(void)
 	screen_tex_pitch = 0;
 }
 
-static void plat_sdl_destroy_screen_copy_texture(void)
-{
-	if (screen_copy_texture) {
-		SDL_DestroyTexture(screen_copy_texture);
-		screen_copy_texture = NULL;
-	}
-}
-
 static int plat_sdl_ensure_screen_texture(unsigned width, unsigned height,
 					  size_t pitch, Uint32 format, bool linear)
 {
@@ -445,26 +479,6 @@ static int plat_sdl_ensure_screen_texture(unsigned width, unsigned height,
 	screen_tex_pitch = pitch;
 	screen_texture_linear = linear;
 	screen_texture_ready = true;
-	return 0;
-}
-
-static int plat_sdl_ensure_screen_copy_texture(void)
-{
-	if (screen_copy_texture)
-		return 0;
-
-	SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "nearest");
-	screen_copy_texture = SDL_CreateTexture(renderer,
-						SDL_PIXELFORMAT_RGB565,
-						SDL_TEXTUREACCESS_STREAMING,
-						SCREEN_WIDTH,
-						SCREEN_HEIGHT);
-	if (!screen_copy_texture) {
-		PA_ERROR("%s, failed to create screen copy texture: %s\n",
-			 __func__, SDL_GetError());
-		return -1;
-	}
-
 	return 0;
 }
 
@@ -513,6 +527,59 @@ static int audio_resample_nearest(struct audio_frame data) {
 	return consumed;
 }
 
+#ifdef USE_SDL2
+static int plat_sdl_update_rgb565_texture(const void *data, unsigned width,
+						  unsigned height, size_t pitch)
+{
+	uint64_t start_us = plat_get_ticks_us_u64();
+	int ret;
+
+	if (pitch >= width * sizeof(uint16_t)) {
+		size_t needed = (size_t)width * height;
+		uint16_t *dst;
+
+		if (hud_frame_pixels_len < needed) {
+			uint16_t *new_pixels = realloc(hud_frame_pixels,
+						      needed * sizeof(uint16_t));
+			if (!new_pixels) {
+				PA_WARN("%s, failed to allocate HUD frame buffer\n", __func__);
+				ret = SDL_UpdateTexture(screen_texture, NULL, data, (int)pitch);
+				goto finish;
+			}
+			hud_frame_pixels = new_pixels;
+			hud_frame_pixels_len = needed;
+		}
+
+		dst = hud_frame_pixels;
+		for (unsigned y = 0; y < height; y++) {
+			memcpy(dst + (size_t)y * width,
+			       (const uint8_t *)data + (size_t)y * pitch,
+			       width * sizeof(uint16_t));
+		}
+		hud_frame_width = width;
+		hud_frame_height = height;
+		hud_frame_pitch = width * sizeof(uint16_t);
+
+		if (msg[0]) {
+			video_clear_msg(dst, height, width);
+			video_print_msg_aligned(dst, height, width, msg);
+			ret = SDL_UpdateTexture(screen_texture, NULL, dst,
+							(int)hud_frame_pitch);
+		} else {
+			ret = SDL_UpdateTexture(screen_texture, NULL, data, (int)pitch);
+		}
+	} else {
+		ret = SDL_UpdateTexture(screen_texture, NULL, data, (int)pitch);
+	}
+
+finish:
+	plat_sdl_profile_add(&sdl_video_profile.update_us,
+			     &sdl_video_profile.update_max_us,
+			     plat_get_ticks_us_u64() - start_us);
+	return ret;
+}
+#endif
+
 static void *fb_flip(void)
 {
 #ifdef USE_SDL2
@@ -544,14 +611,9 @@ static void *fb_flip(void)
 	}
 
 	start_us = plat_get_ticks_us_u64();
-	if (screen_hw_msg_pending) {
-		SDL_RenderCopy(renderer, screen_copy_texture, NULL, NULL);
-		screen_hw_msg_pending = false;
-	} else {
-		SDL_RenderCopy(renderer, screen_texture,
-			      screen_use_hw_scaling ? &screen_src_rect : NULL,
-			      screen_use_hw_scaling ? &screen_dst_rect : NULL);
-	}
+	SDL_RenderCopy(renderer, screen_texture,
+		      screen_use_hw_scaling ? &screen_src_rect : NULL,
+		      screen_use_hw_scaling ? &screen_dst_rect : NULL);
 	plat_sdl_profile_add(&sdl_video_profile.copy_us,
 			     &sdl_video_profile.copy_max_us,
 			     plat_get_ticks_us_u64() - start_us);
@@ -668,9 +730,24 @@ void plat_video_menu_enter(int is_rom_loaded)
 		return;
 
 #ifdef USE_SDL2
-	if (screen_use_hw_scaling)
-		plat_sdl_readback_screen();
+	if (screen_use_hw_scaling) {
+		if (hud_frame_pixels && hud_frame_width && hud_frame_height) {
+			memset(screen_pixels, 0, sizeof(screen_pixels));
+			scale(hud_frame_width, hud_frame_height, hud_frame_pitch,
+			      hud_frame_pixels, screen_pixels);
+		} else {
+			memset(screen_pixels, 0, sizeof(screen_pixels));
+		}
+	}
 	memcpy(g_menubg_src_ptr, screen_pixels, g_menubg_src_h * g_menubg_src_pp * sizeof(uint16_t));
+	/* Menu draws into screen_pixels; force fb_flip() to upload that full-screen buffer instead of reusing the game texture. */
+	if (plat_sdl_ensure_screen_texture(SCREEN_WIDTH, SCREEN_HEIGHT,
+					       SCREEN_PITCH, SDL_PIXELFORMAT_RGB565,
+					       false) == 0) {
+		screen_use_hw_scaling = false;
+		screen_last_dst_rect_valid = false;
+		need_full_clear = 1;
+	}
 #else
 	SDL_LockSurface(screen);
 	memcpy(g_menubg_src_ptr, screen->pixels, g_menubg_src_h * g_menubg_src_pp * sizeof(uint16_t));
@@ -768,10 +845,14 @@ void plat_video_process(const void *data, unsigned width, unsigned height, size_
 				screen_clear_frames = 3;
 			}
 			start_us = plat_get_ticks_us_u64();
-			SDL_UpdateTexture(screen_texture, NULL, data, (int)pitch);
-			plat_sdl_profile_add(&sdl_video_profile.update_us,
-					     &sdl_video_profile.update_max_us,
-					     plat_get_ticks_us_u64() - start_us);
+			if (texture_format == SDL_PIXELFORMAT_RGB565)
+				plat_sdl_update_rgb565_texture(data, width, height, pitch);
+			else {
+				SDL_UpdateTexture(screen_texture, NULL, data, (int)pitch);
+				plat_sdl_profile_add(&sdl_video_profile.update_us,
+						     &sdl_video_profile.update_max_us,
+						     plat_get_ticks_us_u64() - start_us);
+			}
 			screen_use_hw_scaling = true;
 			if (screen_last_log_w != width ||
 			    screen_last_log_h != height ||
@@ -801,25 +882,15 @@ void plat_video_process(const void *data, unsigned width, unsigned height, size_
 #endif
 
 	if (msg[0]) {
-		if (screen_use_hw_scaling) {
-			if (plat_sdl_ensure_screen_copy_texture() == 0) {
-				uint64_t start_us = plat_get_ticks_us_u64();
-				SDL_RenderClear(renderer);
-				SDL_RenderCopy(renderer, screen_texture, &screen_src_rect, &screen_dst_rect);
-				plat_sdl_readback_screen();
-				video_print_msg(pixels, screen_h, screen_pitch, msg);
-				SDL_UpdateTexture(screen_copy_texture, NULL, screen_pixels, SCREEN_PITCH);
-				plat_sdl_profile_add(&sdl_video_profile.hud_us,
-						     &sdl_video_profile.hud_max_us,
-						     plat_get_ticks_us_u64() - start_us);
-				screen_hw_msg_pending = true;
-				had_msg = 1;
-				video_update_msg();
-				return;
-			}
+#ifdef USE_SDL2
+		if (!screen_use_hw_scaling) {
+			video_print_msg(pixels, screen_h, screen_pitch, msg);
+			had_msg = 1;
 		}
+#else
 		video_print_msg(pixels, screen_h, screen_pitch, msg);
 		had_msg = 1;
+#endif
 	}
 
 #ifndef USE_SDL2
@@ -1198,7 +1269,6 @@ int plat_init(void)
 	screen_texture_ready = false;
 	screen_texture_linear = false;
 	screen_use_hw_scaling = false;
-	screen_hw_msg_pending = false;
 	screen_clear_frames = 3;
 	screen_last_dst_rect_valid = false;
 	screen_tex_format = 0;
@@ -1208,7 +1278,11 @@ int plat_init(void)
 	screen_last_log_w = 0;
 	screen_last_log_h = 0;
 	screen_last_log_pitch = 0;
-	screen_copy_texture = NULL;
+	hud_frame_pixels = NULL;
+	hud_frame_pixels_len = 0;
+	hud_frame_width = 0;
+	hud_frame_height = 0;
+	hud_frame_pitch = 0;
 
 	screen = SDL_CreateRGBSurfaceFrom(screen_pixels,
 	                                  SCREEN_WIDTH,
@@ -1281,7 +1355,12 @@ void plat_finish(void)
 	if (screen)
 		SDL_FreeSurface(screen);
 	plat_sdl_destroy_screen_texture();
-	plat_sdl_destroy_screen_copy_texture();
+	free(hud_frame_pixels);
+	hud_frame_pixels = NULL;
+	hud_frame_pixels_len = 0;
+	hud_frame_width = 0;
+	hud_frame_height = 0;
+	hud_frame_pitch = 0;
 	if (renderer)
 		SDL_DestroyRenderer(renderer);
 	if (window)
