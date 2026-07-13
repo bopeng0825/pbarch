@@ -3,6 +3,7 @@
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdint.h>
 #include <string.h>
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -37,6 +38,109 @@ static struct retro_disk_control_ext_callback disk_control_ext;
 
 static uint32_t buttons = 0;
 static int polled = 0;
+
+struct core_cb_profile {
+	unsigned frames;
+	uint64_t last_log_us;
+	uint64_t run_us;
+	uint64_t video_us;
+	uint64_t audio_us;
+	uint64_t input_poll_us;
+	uint64_t input_state_us;
+	uint64_t inner_us;
+	uint32_t run_max_us;
+	uint32_t video_max_us;
+	uint32_t audio_max_us;
+	uint32_t input_poll_max_us;
+	uint32_t input_state_max_us;
+	uint32_t inner_max_us;
+	unsigned video_calls;
+	unsigned audio_calls;
+	unsigned audio_frames;
+	unsigned input_poll_calls;
+	unsigned input_state_calls;
+};
+
+static struct core_cb_profile core_cb_profile;
+static uint64_t core_frame_video_us;
+static uint64_t core_frame_audio_us;
+static uint64_t core_frame_input_poll_us;
+static uint64_t core_frame_input_state_us;
+static unsigned core_frame_video_calls;
+static unsigned core_frame_audio_calls;
+static unsigned core_frame_audio_frames;
+static unsigned core_frame_input_poll_calls;
+static unsigned core_frame_input_state_calls;
+
+static uint64_t core_profile_ticks_us(void)
+{
+	struct timeval tv;
+
+	gettimeofday(&tv, NULL);
+	return (uint64_t)tv.tv_sec * 1000000 + (uint64_t)tv.tv_usec;
+}
+
+static void core_profile_add(uint64_t *total_us, uint32_t *max_us,
+			     uint64_t elapsed_us)
+{
+	*total_us += elapsed_us;
+	if (elapsed_us > *max_us)
+		*max_us = (elapsed_us > UINT32_MAX) ? UINT32_MAX : (uint32_t)elapsed_us;
+}
+
+static void core_profile_finish_frame(uint64_t run_us)
+{
+	uint64_t now = core_profile_ticks_us();
+	uint64_t cb_us = core_frame_video_us + core_frame_audio_us +
+		core_frame_input_poll_us + core_frame_input_state_us;
+	uint64_t inner_us = run_us > cb_us ? run_us - cb_us : 0;
+	uint64_t elapsed;
+
+	if (!core_cb_profile.last_log_us)
+		core_cb_profile.last_log_us = now;
+
+	core_cb_profile.frames++;
+	core_profile_add(&core_cb_profile.run_us, &core_cb_profile.run_max_us, run_us);
+	core_profile_add(&core_cb_profile.video_us, &core_cb_profile.video_max_us, core_frame_video_us);
+	core_profile_add(&core_cb_profile.audio_us, &core_cb_profile.audio_max_us, core_frame_audio_us);
+	core_profile_add(&core_cb_profile.input_poll_us, &core_cb_profile.input_poll_max_us, core_frame_input_poll_us);
+	core_profile_add(&core_cb_profile.input_state_us, &core_cb_profile.input_state_max_us, core_frame_input_state_us);
+	core_profile_add(&core_cb_profile.inner_us, &core_cb_profile.inner_max_us, inner_us);
+	core_cb_profile.video_calls += core_frame_video_calls;
+	core_cb_profile.audio_calls += core_frame_audio_calls;
+	core_cb_profile.audio_frames += core_frame_audio_frames;
+	core_cb_profile.input_poll_calls += core_frame_input_poll_calls;
+	core_cb_profile.input_state_calls += core_frame_input_state_calls;
+
+	elapsed = now - core_cb_profile.last_log_us;
+	if (elapsed >= 1000000 && core_cb_profile.frames) {
+		double frames = (double)core_cb_profile.frames;
+		double secs = (double)elapsed / 1000000.0;
+
+		PA_INFO("PROFILE corecb: fps=%.1f run=%.2f/%u video=%.2f/%u(%u) audio=%.2f/%u(%u/%u) input_poll=%.2f/%u(%u) input_state=%.2f/%u(%u) inner=%.2f/%u ms avg/max\n",
+			frames / secs,
+			(double)core_cb_profile.run_us / frames / 1000.0,
+			core_cb_profile.run_max_us / 1000,
+			(double)core_cb_profile.video_us / frames / 1000.0,
+			core_cb_profile.video_max_us / 1000,
+			core_cb_profile.video_calls,
+			(double)core_cb_profile.audio_us / frames / 1000.0,
+			core_cb_profile.audio_max_us / 1000,
+			core_cb_profile.audio_calls,
+			core_cb_profile.audio_frames,
+			(double)core_cb_profile.input_poll_us / frames / 1000.0,
+			core_cb_profile.input_poll_max_us / 1000,
+			core_cb_profile.input_poll_calls,
+			(double)core_cb_profile.input_state_us / frames / 1000.0,
+			core_cb_profile.input_state_max_us / 1000,
+			core_cb_profile.input_state_calls,
+			(double)core_cb_profile.inner_us / frames / 1000.0,
+			core_cb_profile.inner_max_us / 1000);
+
+		memset(&core_cb_profile, 0, sizeof(core_cb_profile));
+		core_cb_profile.last_log_us = now;
+	}
+}
 
 static int core_load_game_info(struct content *content, struct retro_game_info *game_info) {
 	struct retro_system_info info = {};
@@ -609,6 +713,8 @@ static bool pa_environment(unsigned cmd, void *data) {
 }
 
 static void pa_video_refresh(const void *data, unsigned width, unsigned height, size_t pitch) {
+	uint64_t start_us = core_profile_ticks_us();
+
 	if (should_quit)
 		return;
 
@@ -618,21 +724,35 @@ static void pa_video_refresh(const void *data, unsigned width, unsigned height, 
 	} else {
 		plat_video_dupe();
 	}
+
+	core_frame_video_us += core_profile_ticks_us() - start_us;
+	core_frame_video_calls++;
 }
 
 static void pa_audio_sample(int16_t left, int16_t right) {
+	uint64_t start_us = core_profile_ticks_us();
 	const struct audio_frame frame = { .left = left, .right = right };
+
 	if (!should_quit && enable_audio)
 		plat_sound_write(&frame, 1);
+	core_frame_audio_us += core_profile_ticks_us() - start_us;
+	core_frame_audio_calls++;
+	core_frame_audio_frames++;
 }
 
 static size_t pa_audio_sample_batch(const int16_t *data, size_t frames) {
+	uint64_t start_us = core_profile_ticks_us();
+
 	if (!should_quit && enable_audio)
 		plat_sound_write((const struct audio_frame *)data, frames);
+	core_frame_audio_us += core_profile_ticks_us() - start_us;
+	core_frame_audio_calls++;
+	core_frame_audio_frames += frames;
 	return frames;
 }
 
 static void pa_input_poll(void) {
+	uint64_t start_us = core_profile_ticks_us();
 	int actions[IN_BINDTYPE_COUNT] = { 0, };
 	unsigned int emu_act;
 	int which = EACTION_NONE;
@@ -648,20 +768,28 @@ static void pa_input_poll(void) {
 
 	buttons = actions[IN_BINDTYPE_PLAYER12];
 	polled = 1;
+	core_frame_input_poll_us += core_profile_ticks_us() - start_us;
+	core_frame_input_poll_calls++;
 }
 
 static int16_t pa_input_state(unsigned port, unsigned device, unsigned index, unsigned id) {
+	uint64_t start_us;
+	int16_t ret = 0;
+
+	if (port == 0 && device == RETRO_DEVICE_JOYPAD && index == 0 && !polled)
+		pa_input_poll();
+
+	start_us = core_profile_ticks_us();
 	if (port == 0 && device == RETRO_DEVICE_JOYPAD && index == 0) {
-		if (!polled)
-			pa_input_poll();
-
 		if (id == RETRO_DEVICE_ID_JOYPAD_MASK)
-			return buttons;
-
-		return (buttons >> id) & 1;
+			ret = buttons;
+		else
+			ret = (buttons >> id) & 1;
 	}
 
-	return 0;
+	core_frame_input_state_us += core_profile_ticks_us() - start_us;
+	core_frame_input_state_calls++;
+	return ret;
 }
 
 void core_extract_name(const char* core_file, char *buf, size_t len) {
@@ -860,8 +988,21 @@ void core_apply_cheats(struct cheats *cheats) {
 }
 
 void core_run_frame(void) {
+	uint64_t start_us;
+
 	polled = 0;
+	core_frame_video_us = 0;
+	core_frame_audio_us = 0;
+	core_frame_input_poll_us = 0;
+	core_frame_input_state_us = 0;
+	core_frame_video_calls = 0;
+	core_frame_audio_calls = 0;
+	core_frame_audio_frames = 0;
+	core_frame_input_poll_calls = 0;
+	core_frame_input_state_calls = 0;
+	start_us = core_profile_ticks_us();
 	current_core.retro_run();
+	core_profile_finish_frame(core_profile_ticks_us() - start_us);
 }
 
 void core_unload_content(void) {

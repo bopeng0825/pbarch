@@ -50,6 +50,8 @@ struct sdl_video_profile {
 	uint64_t readback_us;
 	uint64_t hud_us;
 	uint64_t audio_wait_us;
+	uint64_t audio_wait_frame_us;
+	uint64_t pace_us;
 	uint32_t update_max_us;
 	uint32_t clear_max_us;
 	uint32_t copy_max_us;
@@ -58,6 +60,8 @@ struct sdl_video_profile {
 	uint32_t readback_max_us;
 	uint32_t hud_max_us;
 	uint32_t audio_wait_max_us;
+	uint32_t audio_wait_frame_max_us;
+	uint32_t pace_max_us;
 	unsigned late_present_frames;
 };
 
@@ -173,6 +177,11 @@ static void plat_sdl_profile_frame(void)
 			sdl_video_profile.hud_max_us / 1000,
 			(double)sdl_video_profile.audio_wait_us / frames / 1000.0,
 			sdl_video_profile.audio_wait_max_us / 1000);
+		PA_INFO("PROFILE sdl2: pace=%.2f/%u audio_wait_frame=%.2f/%u ms avg/max\n",
+			(double)sdl_video_profile.pace_us / frames / 1000.0,
+			sdl_video_profile.pace_max_us / 1000,
+			(double)sdl_video_profile.audio_wait_us / frames / 1000.0,
+			sdl_video_profile.audio_wait_frame_max_us / 1000);
 
 		memset(&sdl_video_profile, 0, sizeof(sdl_video_profile));
 		sdl_video_profile.last_log_us = now;
@@ -831,6 +840,12 @@ void plat_video_flip(void)
 
 	if (frame_dirty) {
 #ifdef USE_SDL2
+		uint64_t frame_audio_wait_us = sdl_video_profile.audio_wait_frame_us;
+
+		if (frame_audio_wait_us > sdl_video_profile.audio_wait_frame_max_us)
+			sdl_video_profile.audio_wait_frame_max_us =
+				(frame_audio_wait_us > UINT32_MAX) ? UINT32_MAX : (uint32_t)frame_audio_wait_us;
+		sdl_video_profile.audio_wait_frame_us = 0;
 		sdl_flip_start_us = plat_get_ticks_us_u64();
 #endif
 		if (enable_drc && !screen_renderer_vsync) {
@@ -838,11 +853,19 @@ void plat_video_flip(void)
 
 			if (limit_frames && time < next_frame_time_us) {
 				uint32_t delaytime = (next_frame_time_us - time - 1) / 1000 + 1;
+#ifdef USE_SDL2
+				uint64_t pace_start_us = plat_get_ticks_us_u64();
+#endif
 
 				if (delaytime < 1000)
 					SDL_Delay(delaytime);
 				else
 					next_frame_time_us = 0;
+#ifdef USE_SDL2
+				plat_sdl_profile_add(&sdl_video_profile.pace_us,
+						     &sdl_video_profile.pace_max_us,
+						     plat_get_ticks_us_u64() - pace_start_us);
+#endif
 
 				time = plat_get_ticks_us_u64();
 			}
@@ -944,8 +967,8 @@ static int plat_sound_init(void)
 
 	spec.freq = MIN(requested_sample_rate, MAX_SAMPLE_RATE);
 	spec.format = AUDIO_S16;
-	spec.channels = 2;
-	spec.samples = 512;
+	spec.channels = 1;
+	spec.samples = 4096;
 	spec.callback = plat_sound_callback;
 
 	if (SDL_OpenAudio(&spec, &received) < 0) {
@@ -1021,9 +1044,13 @@ void plat_sound_write_resample(const struct audio_frame *data, int frames, int (
 #endif
 			plat_sleep_ms(1);
 #ifdef USE_SDL2
-			plat_sdl_profile_add(&sdl_video_profile.audio_wait_us,
-					     &sdl_video_profile.audio_wait_max_us,
-					     plat_get_ticks_us_u64() - wait_start_us);
+			{
+				uint64_t wait_us = plat_get_ticks_us_u64() - wait_start_us;
+				plat_sdl_profile_add(&sdl_video_profile.audio_wait_us,
+						     &sdl_video_profile.audio_wait_max_us,
+						     wait_us);
+				sdl_video_profile.audio_wait_frame_us += wait_us;
+			}
 #endif
 			SDL_LockAudio();
 		}
