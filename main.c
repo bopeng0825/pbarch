@@ -42,9 +42,67 @@ static uint32_t renders;
 
 extern int video_width;
 extern int video_height;
-extern int need_full_clear;
 
 #define UNDERRUN_THRESHOLD 50
+
+struct loop_profile {
+	unsigned frames;
+	unsigned last_log_us;
+	unsigned long long adjust_us;
+	unsigned long long core_us;
+	unsigned long long action_us;
+	unsigned long long flip_us;
+	unsigned adjust_max_us;
+	unsigned core_max_us;
+	unsigned action_max_us;
+	unsigned flip_max_us;
+};
+
+static struct loop_profile loop_profile;
+
+static void loop_profile_add(unsigned *max_us, unsigned long long *total_us,
+			     unsigned elapsed_us)
+{
+	*total_us += elapsed_us;
+	if (elapsed_us > *max_us)
+		*max_us = elapsed_us;
+}
+
+static void loop_profile_frame(unsigned adjust_us, unsigned core_us,
+			       unsigned action_us, unsigned flip_us)
+{
+	unsigned now = plat_get_ticks_us();
+	unsigned elapsed;
+
+	if (!loop_profile.last_log_us)
+		loop_profile.last_log_us = now;
+
+	loop_profile.frames++;
+	loop_profile_add(&loop_profile.adjust_max_us, &loop_profile.adjust_us, adjust_us);
+	loop_profile_add(&loop_profile.core_max_us, &loop_profile.core_us, core_us);
+	loop_profile_add(&loop_profile.action_max_us, &loop_profile.action_us, action_us);
+	loop_profile_add(&loop_profile.flip_max_us, &loop_profile.flip_us, flip_us);
+
+	elapsed = now - loop_profile.last_log_us;
+	if (elapsed >= 1000000 && loop_profile.frames) {
+		double frames = (double)loop_profile.frames;
+		double secs = (double)elapsed / 1000000.0;
+
+		PA_INFO("PROFILE main: fps=%.1f adjust=%.2f/%u core=%.2f/%u action=%.2f/%u flip=%.2f/%u ms avg/max\n",
+			frames / secs,
+			(double)loop_profile.adjust_us / frames / 1000.0,
+			loop_profile.adjust_max_us / 1000,
+			(double)loop_profile.core_us / frames / 1000.0,
+			loop_profile.core_max_us / 1000,
+			(double)loop_profile.action_us / frames / 1000.0,
+			loop_profile.action_max_us / 1000,
+			(double)loop_profile.flip_us / frames / 1000.0,
+			loop_profile.flip_max_us / 1000);
+
+		memset(&loop_profile, 0, sizeof(loop_profile));
+		loop_profile.last_log_us = now;
+	}
+}
 
 static void toggle_fast_forward(int force_off)
 {
@@ -762,10 +820,16 @@ int main(int argc, char **argv) {
 #endif
 
 	do {
+		unsigned t0, t1, t2, t3, t4;
+
 		count_fps();
+		t0 = plat_get_ticks_us();
 		adjust_audio();
+		t1 = plat_get_ticks_us();
 		core_run_frame();
+		t2 = plat_get_ticks_us();
 		perform_emu_action();
+		t3 = plat_get_ticks_us();
 #ifdef FUNKEY_S
 		if (should_suspend) {
 			toggle_fast_forward(1);
@@ -775,6 +839,8 @@ int main(int argc, char **argv) {
 
 		if (!should_quit)
 			plat_video_flip();
+		t4 = plat_get_ticks_us();
+		loop_profile_frame(t1 - t0, t2 - t1, t3 - t2, t4 - t3);
 	} while (!should_quit);
 
 	return quit(0);

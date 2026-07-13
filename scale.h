@@ -38,4 +38,6 @@ enum scale_filter {
 void scale_update_scaler(void);
 void scale(unsigned w, unsigned h, size_t pitch, const void *src, void *dst);
 
+extern int need_full_clear;
+
 #endif

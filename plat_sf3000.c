@@ -4,6 +4,7 @@
 #include "libpicofe/plat.h"
 #include "libpicofe/input.h"
 #include "libpicofe/in_sdl.h"
+#include "libpicofe/linux/in_evdev.h"
 #include "main.h"
 #include "util.h"
 
@@ -75,5 +76,32 @@ static const struct in_pdata in_sdl_platform_data = {
 	.mod_keymap   = in_sdl_mod_keymap,
 	.modmap_size  = array_size(in_sdl_mod_keymap),
 };
+
+static const struct in_pdata in_evdev_platform_data = {
+	.defbinds     = in_sdl_defbinds,
+	.key_map      = in_sdl_key_map,
+	.kmap_size    = array_size(in_sdl_key_map),
+	.joy_map      = in_sdl_joy_map,
+	.jmap_size    = array_size(in_sdl_joy_map),
+	.mod_key      = BTN_MODE,
+};
+
+static int plat_input_init(const struct in_pdata *pdata, void (*handler)(void *event))
+{
+	(void)pdata;
+	(void)handler;
+
+	if (in_evdev_init(&in_evdev_platform_data)) {
+		PA_ERROR("evdev input failed to init\n");
+		return -1;
+	}
+
+	if (in_sdl_init(&in_sdl_platform_data, handler))
+		PA_WARN("SDL input fallback failed to init: %s\n", SDL_GetError());
+
+	return 0;
+}
+
+#define in_sdl_init plat_input_init
 
 #include "plat_sdl.c"

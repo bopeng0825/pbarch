@@ -609,9 +609,14 @@ static bool pa_environment(unsigned cmd, void *data) {
 }
 
 static void pa_video_refresh(const void *data, unsigned width, unsigned height, size_t pitch) {
-	if (data && !should_quit) {
+	if (should_quit)
+		return;
+
+	if (data) {
 		pa_track_render();
 		video_process(data, width, height, pitch);
+	} else {
+		plat_video_dupe();
 	}
 }
 
