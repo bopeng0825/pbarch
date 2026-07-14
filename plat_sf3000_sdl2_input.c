@@ -43,6 +43,21 @@ static const char * const sf3000_sdl2_key_names[SF3000_SDL2_KEY_COUNT] = {
 	[SF3000_SDL2_BUTTON(14)] = "joy 14",
 	[SF3000_SDL2_BUTTON(15)] = "joy 15",
 	[SF3000_SDL2_BUTTON(16)] = "joy 16",
+	[SF3000_SDL2_BUTTON(17)] = "joy 17",
+	[SF3000_SDL2_BUTTON(18)] = "joy 18",
+	[SF3000_SDL2_BUTTON(19)] = "joy 19",
+	[SF3000_SDL2_BUTTON(20)] = "joy 20",
+	[SF3000_SDL2_BUTTON(21)] = "joy 21",
+	[SF3000_SDL2_BUTTON(22)] = "joy 22",
+	[SF3000_SDL2_BUTTON(23)] = "joy 23",
+	[SF3000_SDL2_BUTTON(24)] = "joy 24",
+	[SF3000_SDL2_BUTTON(25)] = "joy 25",
+	[SF3000_SDL2_BUTTON(26)] = "joy 26",
+	[SF3000_SDL2_BUTTON(27)] = "joy 27",
+	[SF3000_SDL2_BUTTON(28)] = "joy 28",
+	[SF3000_SDL2_BUTTON(29)] = "joy 29",
+	[SF3000_SDL2_BUTTON(30)] = "joy 30",
+	[SF3000_SDL2_BUTTON(31)] = "joy 31",
 	[SF3000_SDL2_AXIS_NEG(0)] = "axis 0-",
 	[SF3000_SDL2_AXIS_POS(0)] = "axis 0+",
 	[SF3000_SDL2_AXIS_NEG(1)] = "axis 1-",
@@ -281,16 +296,25 @@ static int sf3000_sdl2_update_keycode(void *drv_data, int *is_down)
 			if (!event_matches_joy(state, &event) ||
 			    event.jaxis.axis >= SF3000_SDL2_AXIS_COUNT)
 				continue;
-			if (event.jaxis.value < -AXIS_DEADZONE)
-				key = SF3000_SDL2_AXIS_NEG(event.jaxis.axis);
-			else if (event.jaxis.value > AXIS_DEADZONE)
-				key = SF3000_SDL2_AXIS_POS(event.jaxis.axis);
-			else
-				continue;
-			if (is_down)
-				*is_down = 1;
-			handle_axis(state, event.jaxis.axis, event.jaxis.value);
-			return key;
+			{
+				int neg = SF3000_SDL2_AXIS_NEG(event.jaxis.axis);
+				int pos = SF3000_SDL2_AXIS_POS(event.jaxis.axis);
+				int old_neg = state->keys[neg];
+				int old_pos = state->keys[pos];
+
+				handle_axis(state, event.jaxis.axis, event.jaxis.value);
+				if (state->keys[neg] != old_neg) {
+					if (is_down)
+						*is_down = state->keys[neg];
+					return neg;
+				}
+				if (state->keys[pos] != old_pos) {
+					if (is_down)
+						*is_down = state->keys[pos];
+					return pos;
+				}
+			}
+			continue;
 		default:
 			break;
 		}
