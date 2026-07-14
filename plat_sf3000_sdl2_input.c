@@ -196,6 +196,10 @@ static void sf3000_sdl2_probe(const in_drv_t *drv)
 	int i, joycount;
 	char name[256];
 
+#ifdef SDL_HINT_JOYSTICK_ALLOW_BACKGROUND_EVENTS
+	SDL_SetHint(SDL_HINT_JOYSTICK_ALLOW_BACKGROUND_EVENTS, "1");
+#endif
+
 	if (SDL_InitSubSystem(SDL_INIT_JOYSTICK | SDL_INIT_GAMECONTROLLER) != 0) {
 		return;
 	}
