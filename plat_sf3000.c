@@ -130,8 +130,8 @@ static int plat_input_init(const struct in_pdata *pdata, void (*handler)(void *e
 		return -1;
 	}
 
-	if (in_evdev_init(&in_evdev_platform_data))
-		PA_WARN("evdev input fallback failed to init\n");
+	//if (in_evdev_init(&in_evdev_platform_data))
+	//	PA_WARN("evdev input fallback failed to init\n");
 
 	return 0;
 }
