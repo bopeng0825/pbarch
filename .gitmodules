@@ -1,7 +1,7 @@
 [submodule "libpicofe"]
 	path = libpicofe
 	url = https://github.com/bopeng0825/libpicofe.git
-	branch = pb
+	branch = main
 [submodule "libretro-common"]
 	path = libretro-common
 	url = https://github.com/libretro/libretro-common
