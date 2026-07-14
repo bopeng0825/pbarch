@@ -4,7 +4,7 @@
 #ifdef FUNKEY_S
 #define SCREEN_WIDTH 240
 #define SCREEN_HEIGHT 240
-#elif defined(SF3000)
+#elif defined(H150101)
 #define SCREEN_WIDTH 640
 #define SCREEN_HEIGHT 480
 #else

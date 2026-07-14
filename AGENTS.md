@@ -2,7 +2,7 @@
 
 ## Project Structure & Module Organization
 
-This repository contains `picoarch`, a small C libretro frontend for low-power handheld devices. Top-level `*.c` and `*.h` files hold the frontend core, menu, content loading, scaling, patching, and platform glue. Platform-specific entry points live in files such as `plat_linux.c`, `plat_trimui.c`, `plat_funkey.c`, and `plat_sf3000.c`.
+This repository contains `picoarch`, a small C libretro frontend for low-power handheld devices. Top-level `*.c` and `*.h` files hold the frontend core, menu, content loading, scaling, patching, and platform glue. Platform-specific entry points live in files such as `plat_linux.c`, `plat_trimui.c`, `plat_funkey.c`, and `plat_h150101.c`.
 
 Bundled helper code is under `libpicofe/` and `libretro-common/`. FunKey-specific UI code is in `funkey/`. Per-core option and behavior overrides are in `overrides/`, while downstream core patches are grouped by core in `patches/`. User-facing platform notes are in `README.md`, `README.trimui.md`, and `README.funkey-s.md`.
 

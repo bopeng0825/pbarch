@@ -147,11 +147,11 @@ else ifeq ($(platform), funkey-s)
 	LDFLAGS += -fPIC
 	LDFLAGS += -lSDL_image -lSDL_ttf # For fk_menu
 	core_platform = unix-armv7-hardfloat-neon
-else ifeq ($(platform), sf3000)
+else ifeq ($(platform), h150101)
 	SOURCES := $(filter-out libpicofe/in_sdl.c,$(SOURCES))
-	SOURCES += plat_sf3000.c plat_sf3000_sdl2_input.c
+	SOURCES += plat_h150101.c plat_h150101_sdl2_input.c
 	CFLAGS += -DUSE_SDL2 $(shell $(SYSROOT)/usr/bin/sdl2-config --cflags)
-	CFLAGS += -DCONTENT_DIR='"/mnt"' -DSF3000 -march=mips32r2 -mhard-float
+	CFLAGS += -DCONTENT_DIR='"/mnt"' -DH150101 -march=mips32r2 -mhard-float
 	LDFLAGS += $(shell $(SYSROOT)/usr/bin/sdl2-config --libs)
 	LDFLAGS += -fPIC
 else ifeq ($(platform), unix)
