@@ -148,7 +148,8 @@ else ifeq ($(platform), funkey-s)
 	LDFLAGS += -lSDL_image -lSDL_ttf # For fk_menu
 	core_platform = unix-armv7-hardfloat-neon
 else ifeq ($(platform), sf3000)
-	SOURCES += plat_sf3000.c
+	SOURCES := $(filter-out libpicofe/in_sdl.c,$(SOURCES))
+	SOURCES += plat_sf3000.c plat_sf3000_sdl2_input.c
 	CFLAGS += -DUSE_SDL2 $(shell $(SYSROOT)/usr/bin/sdl2-config --cflags)
 	CFLAGS += -DCONTENT_DIR='"/mnt"' -DSF3000 -march=mips32r2 -mhard-float
 	LDFLAGS += $(shell $(SYSROOT)/usr/bin/sdl2-config --libs)
