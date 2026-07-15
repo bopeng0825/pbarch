@@ -434,6 +434,81 @@ static void plat_sdl_compute_hw_rects(unsigned width, unsigned height,
 	dst->h = dst_h;
 }
 
+static void plat_sdl_reset_renderer_state(void)
+{
+	screen_use_hw_scaling = false;
+	screen_clear_frames = 3;
+	screen_last_dst_rect_valid = false;
+	screen_tex_format = 0;
+	screen_tex_w = 0;
+	screen_tex_h = 0;
+	screen_tex_pitch = 0;
+	screen_last_log_w = 0;
+	screen_last_log_h = 0;
+	screen_last_log_pitch = 0;
+}
+
+static void plat_sdl_log_renderer_info(void)
+{
+	SDL_RendererInfo info;
+
+	if (SDL_GetRendererInfo(renderer, &info) != 0)
+		return;
+
+	PA_INFO("SDL video driver: %s\n",
+		SDL_GetCurrentVideoDriver() ? SDL_GetCurrentVideoDriver() : "unknown");
+	PA_INFO("SDL renderer: %s%s%s%s\n",
+		info.name ? info.name : "unknown",
+		(info.flags & SDL_RENDERER_ACCELERATED) ? " accelerated" : "",
+		(info.flags & SDL_RENDERER_SOFTWARE) ? " software" : "",
+		(info.flags & SDL_RENDERER_PRESENTVSYNC) ? " vsync" : "");
+	screen_renderer_vsync = !!(info.flags & SDL_RENDERER_PRESENTVSYNC);
+#ifdef H150101
+	if (screen_renderer_vsync && !getenv("PICOARCH_TRUST_RENDERER_VSYNC")) {
+		PA_INFO("H150101: ignoring renderer vsync flag; using manual frame pacing\n");
+		screen_renderer_vsync = false;
+	}
+#endif
+	if (screen_renderer_vsync)
+		PA_INFO("SDL renderer vsync active; skipping manual frame delay\n");
+}
+
+static void plat_sdl_configure_renderer_output(void)
+{
+	SDL_Rect viewport = { 0, 0, SCREEN_WIDTH, SCREEN_HEIGHT };
+
+	SDL_SetWindowSize(window, SCREEN_WIDTH, SCREEN_HEIGHT);
+	if (SDL_RenderSetLogicalSize(renderer, SCREEN_WIDTH, SCREEN_HEIGHT) != 0) {
+		PA_WARN("%s, failed to set logical size %dx%d: %s\n",
+			__func__, SCREEN_WIDTH, SCREEN_HEIGHT, SDL_GetError());
+	}
+	if (SDL_RenderSetViewport(renderer, &viewport) != 0) {
+		PA_WARN("%s, failed to set viewport %dx%d: %s\n",
+			__func__, SCREEN_WIDTH, SCREEN_HEIGHT, SDL_GetError());
+	}
+	SDL_RenderClear(renderer);
+}
+
+static int plat_sdl_create_renderer(void)
+{
+	screen_renderer_vsync = false;
+	SDL_SetHint(SDL_HINT_RENDER_VSYNC, "0");
+	renderer = SDL_CreateRenderer(window, -1,
+				      SDL_RENDERER_ACCELERATED);
+	if (!renderer) {
+		PA_WARN("%s, accelerated renderer unavailable: %s\n", __func__, SDL_GetError());
+		renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
+	}
+	if (!renderer) {
+		PA_ERROR("%s, failed to create accelerated renderer: %s\n", __func__, SDL_GetError());
+		return -1;
+	}
+
+	plat_sdl_configure_renderer_output();
+	plat_sdl_log_renderer_info();
+	return 0;
+}
+
 static void plat_sdl_destroy_screen_texture(void)
 {
 	if (screen_texture) {
@@ -447,9 +522,24 @@ static void plat_sdl_destroy_screen_texture(void)
 	screen_tex_pitch = 0;
 }
 
+static int plat_sdl_recreate_renderer(void)
+{
+	plat_sdl_destroy_screen_texture();
+
+	if (renderer) {
+		SDL_DestroyRenderer(renderer);
+		renderer = NULL;
+	}
+
+	plat_sdl_reset_renderer_state();
+	return plat_sdl_create_renderer();
+}
+
 static int plat_sdl_ensure_screen_texture(unsigned width, unsigned height,
 					  size_t pitch, Uint32 format, bool linear)
 {
+	char error[128];
+
 	if (screen_texture &&
 	    screen_tex_format == format &&
 	    screen_tex_w == width &&
@@ -467,6 +557,23 @@ static int plat_sdl_ensure_screen_texture(unsigned width, unsigned height,
 					   SDL_TEXTUREACCESS_STREAMING,
 					   width,
 					   height);
+	if (!screen_texture) {
+		snprintf(error, sizeof(error), "%s", SDL_GetError());
+		if (strstr(error, "Invalid renderer")) {
+			PA_WARN("%s, renderer became invalid; recreating SDL renderer\n",
+				__func__);
+			if (plat_sdl_recreate_renderer() == 0) {
+				SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY,
+					    linear ? "linear" : "nearest");
+				screen_texture = SDL_CreateTexture(renderer,
+								   format,
+								   SDL_TEXTUREACCESS_STREAMING,
+								   width,
+								   height);
+			}
+		}
+	}
+
 	if (!screen_texture) {
 		PA_ERROR("%s, failed to create screen texture %ux%u: %s\n",
 			 __func__, width, height, SDL_GetError());
@@ -1231,53 +1338,13 @@ int plat_init(void)
 		return -1;
 	}
 
-	screen_renderer_vsync = false;
-	SDL_SetHint(SDL_HINT_RENDER_VSYNC, "0");
-	renderer = SDL_CreateRenderer(window, -1,
-	                              SDL_RENDERER_ACCELERATED);
-	if (!renderer) {
-		PA_WARN("%s, accelerated renderer unavailable: %s\n", __func__, SDL_GetError());
-		renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
-	}
-	if (!renderer) {
-		PA_ERROR("%s, failed to create accelerated renderer: %s\n", __func__, SDL_GetError());
+	if (plat_sdl_create_renderer())
 		return -1;
-	}
-	{
-		SDL_RendererInfo info;
-		if (SDL_GetRendererInfo(renderer, &info) == 0) {
-			PA_INFO("SDL video driver: %s\n",
-				SDL_GetCurrentVideoDriver() ? SDL_GetCurrentVideoDriver() : "unknown");
-			PA_INFO("SDL renderer: %s%s%s%s\n",
-				info.name ? info.name : "unknown",
-				(info.flags & SDL_RENDERER_ACCELERATED) ? " accelerated" : "",
-				(info.flags & SDL_RENDERER_SOFTWARE) ? " software" : "",
-				(info.flags & SDL_RENDERER_PRESENTVSYNC) ? " vsync" : "");
-			screen_renderer_vsync = !!(info.flags & SDL_RENDERER_PRESENTVSYNC);
-#ifdef H150101
-			if (screen_renderer_vsync && !getenv("PICOARCH_TRUST_RENDERER_VSYNC")) {
-				PA_INFO("H150101: ignoring renderer vsync flag; using manual frame pacing\n");
-				screen_renderer_vsync = false;
-			}
-#endif
-			if (screen_renderer_vsync)
-				PA_INFO("SDL renderer vsync active; skipping manual frame delay\n");
-		}
-	}
 
 	screen_texture = NULL;
 	screen_texture_ready = false;
 	screen_texture_linear = false;
-	screen_use_hw_scaling = false;
-	screen_clear_frames = 3;
-	screen_last_dst_rect_valid = false;
-	screen_tex_format = 0;
-	screen_tex_w = 0;
-	screen_tex_h = 0;
-	screen_tex_pitch = 0;
-	screen_last_log_w = 0;
-	screen_last_log_h = 0;
-	screen_last_log_pitch = 0;
+	plat_sdl_reset_renderer_state();
 	hud_frame_pixels = NULL;
 	hud_frame_pixels_len = 0;
 	hud_frame_width = 0;

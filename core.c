@@ -71,6 +71,7 @@ static unsigned core_frame_audio_calls;
 static unsigned core_frame_audio_frames;
 static unsigned core_frame_input_poll_calls;
 static unsigned core_frame_input_state_calls;
+static int core_profile_skip_video = -1;
 
 static uint64_t core_profile_ticks_us(void)
 {
@@ -78,6 +79,21 @@ static uint64_t core_profile_ticks_us(void)
 
 	gettimeofday(&tv, NULL);
 	return (uint64_t)tv.tv_sec * 1000000 + (uint64_t)tv.tv_usec;
+}
+
+static int core_profile_should_skip_video(void)
+{
+	const char *env;
+
+	if (core_profile_skip_video >= 0)
+		return core_profile_skip_video;
+
+	env = getenv("PICOARCH_PROFILE_SKIP_VIDEO");
+	core_profile_skip_video = env && strcmp(env, "0") ? 1 : 0;
+	if (core_profile_skip_video)
+		PA_INFO("PROFILE: skipping video refresh work\n");
+
+	return core_profile_skip_video;
 }
 
 static void core_profile_add(uint64_t *total_us, uint32_t *max_us,
@@ -718,6 +734,9 @@ static void pa_video_refresh(const void *data, unsigned width, unsigned height, 
 	if (should_quit)
 		return;
 
+	if (core_profile_should_skip_video())
+		goto finish;
+
 	if (data) {
 		pa_track_render();
 		video_process(data, width, height, pitch);
@@ -725,6 +744,7 @@ static void pa_video_refresh(const void *data, unsigned width, unsigned height, 
 		plat_video_dupe();
 	}
 
+finish:
 	core_frame_video_us += core_profile_ticks_us() - start_us;
 	core_frame_video_calls++;
 }
