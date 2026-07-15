@@ -3,6 +3,7 @@
 #include <string.h>
 #include <SDL/SDL.h>
 #include "libpicofe/input.h"
+#include "main.h"
 #include "plat_h150101_sdl2_input.h"
 
 #define IN_H150101_SDL2_PREFIX "h150101-sdl2:"
@@ -187,6 +188,15 @@ static void poll_events(struct h150101_sdl2_state *state)
 		SDL_PushEvent(&skipped[i]);
 }
 
+static void sync_button_key(struct h150101_sdl2_state *state, int button)
+{
+	if (!state->joy || button >= H150101_SDL2_BUTTON_COUNT)
+		return;
+
+	set_key(state, H150101_SDL2_BUTTON(button),
+		SDL_JoystickGetButton(state->joy, button) == SDL_PRESSED);
+}
+
 static void h150101_sdl2_probe(const in_drv_t *drv)
 {
 	const struct h150101_sdl2_pdata *pdata = drv->pdata;
@@ -256,12 +266,24 @@ static const char * const *h150101_sdl2_get_key_names(const in_drv_t *drv, int *
 static int h150101_sdl2_update(void *drv_data, const int *binds, int *result)
 {
 	struct h150101_sdl2_state *state = drv_data;
+	int quit_combo;
 	int i, b;
 
 	poll_events(state);
+	SDL_JoystickUpdate();
+	sync_button_key(state, 8);
+	sync_button_key(state, 9);
+
+	quit_combo = state->keys[H150101_SDL2_BUTTON(8)] &&
+		     state->keys[H150101_SDL2_BUTTON(9)];
+	if (quit_combo)
+		result[IN_BINDTYPE_EMU] |= 1 << EACTION_QUIT;
 
 	for (i = 0; i < H150101_SDL2_KEY_COUNT; i++) {
 		if (!state->keys[i])
+			continue;
+		if (quit_combo &&
+		    (i == H150101_SDL2_BUTTON(8) || i == H150101_SDL2_BUTTON(9)))
 			continue;
 		for (b = 0; b < IN_BINDTYPE_COUNT; b++)
 			result[b] |= binds[IN_BIND_OFFS(i, b)];

@@ -687,6 +687,24 @@ finish:
 }
 #endif
 
+static void plat_sound_pause(void)
+{
+	SDL_PauseAudio(1);
+}
+
+static void plat_sound_resume(void)
+{
+	SDL_LockAudio();
+	if (audio.buf && audio.buf_len) {
+		memset(audio.buf, 0, audio.buf_len * sizeof(struct audio_frame));
+		audio.buf_w = 0;
+		audio.buf_r = 0;
+		audio.max_buf_w = audio.buf_len - 1;
+	}
+	SDL_UnlockAudio();
+	SDL_PauseAudio(0);
+}
+
 static void *fb_flip(void)
 {
 #ifdef USE_SDL2
@@ -836,6 +854,8 @@ void plat_video_menu_enter(int is_rom_loaded)
 	if (g_menuscreen_ptr)
 		return;
 
+	plat_sound_pause();
+
 #ifdef USE_SDL2
 	if (screen_use_hw_scaling) {
 		if (hud_frame_pixels && hud_frame_width && hud_frame_height) {
@@ -899,6 +919,7 @@ void plat_video_menu_leave(void)
 #endif
 
 	g_menuscreen_ptr = NULL;
+	plat_sound_resume();
 }
 
 void plat_video_open(void)
@@ -1146,7 +1167,7 @@ static int plat_sound_init(void)
 	spec.freq = MIN(requested_sample_rate, MAX_SAMPLE_RATE);
 	spec.format = AUDIO_S16;
 	spec.channels = 1;
-	spec.samples = 4096;
+	spec.samples = 8192;
 	spec.callback = plat_sound_callback;
 
 	if (SDL_OpenAudio(&spec, &received) < 0) {
