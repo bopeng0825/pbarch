@@ -210,7 +210,7 @@ static void h150101_sdl2_probe(const in_drv_t *drv)
 	SDL_SetHint(SDL_HINT_JOYSTICK_ALLOW_BACKGROUND_EVENTS, "1");
 #endif
 
-	if (SDL_InitSubSystem(SDL_INIT_JOYSTICK | SDL_INIT_GAMECONTROLLER) != 0) {
+	if (SDL_InitSubSystem(SDL_INIT_JOYSTICK) != 0) {
 		return;
 	}
 
@@ -266,27 +266,44 @@ static const char * const *h150101_sdl2_get_key_names(const in_drv_t *drv, int *
 static int h150101_sdl2_update(void *drv_data, const int *binds, int *result)
 {
 	struct h150101_sdl2_state *state = drv_data;
-	int quit_combo;
+	static int quit_count = 0;
 	int i, b;
 
 	poll_events(state);
 	SDL_JoystickUpdate();
-	sync_button_key(state, 8);
-	sync_button_key(state, 9);
 
-	quit_combo = state->keys[H150101_SDL2_BUTTON(8)] &&
-		     state->keys[H150101_SDL2_BUTTON(9)];
-	if (quit_combo)
-		result[IN_BINDTYPE_EMU] |= 1 << EACTION_QUIT;
+	// sync_button_key(state, 8);
+	// sync_button_key(state, 9);
+
+
+	if (state->keys[H150101_SDL2_BUTTON(8)] &&
+	    state->keys[H150101_SDL2_BUTTON(9)]) {
+
+		quit_count++;
+
+		// 约0.5秒
+		if (quit_count > 30)
+			result[IN_BINDTYPE_EMU] |= 1 << EACTION_QUIT;
+
+	} else {
+		quit_count = 0;
+	}
+
 
 	for (i = 0; i < H150101_SDL2_KEY_COUNT; i++) {
+
 		if (!state->keys[i])
 			continue;
-		if (quit_combo &&
-		    (i == H150101_SDL2_BUTTON(8) || i == H150101_SDL2_BUTTON(9)))
-			continue;
-		for (b = 0; b < IN_BINDTYPE_COUNT; b++)
+
+
+		for (b = 0; b < IN_BINDTYPE_COUNT; b++) {
+			if ((i == H150101_SDL2_BUTTON(8) ||
+			     i == H150101_SDL2_BUTTON(9)) &&
+			    b == IN_BINDTYPE_EMU)
+				continue;
+
 			result[b] |= binds[IN_BIND_OFFS(i, b)];
+		}
 	}
 
 	return 0;

@@ -84,6 +84,7 @@ struct audio_state {
 	int out_sample_rate;
 	int sample_rate_adj;
 	int adj_out_sample_rate;
+	bool paused;
 };
 
 struct audio_state audio;
@@ -489,6 +490,26 @@ static void plat_sdl_configure_renderer_output(void)
 	SDL_RenderClear(renderer);
 }
 
+static int plat_sdl_create_window(void)
+{
+	window = SDL_CreateWindow("picoarch",
+	                          SDL_WINDOWPOS_CENTERED,
+	                          SDL_WINDOWPOS_CENTERED,
+	                          SCREEN_WIDTH,
+	                          SCREEN_HEIGHT,
+#ifdef H150101
+	                          SDL_WINDOW_SHOWN | SDL_WINDOW_FULLSCREEN_DESKTOP);
+#else
+	                          SDL_WINDOW_SHOWN);
+#endif
+	if (!window) {
+		PA_ERROR("%s, failed to create window: %s\n", __func__, SDL_GetError());
+		return -1;
+	}
+
+	return 0;
+}
+
 static int plat_sdl_create_renderer(void)
 {
 	screen_renderer_vsync = false;
@@ -497,10 +518,10 @@ static int plat_sdl_create_renderer(void)
 				      SDL_RENDERER_ACCELERATED);
 	if (!renderer) {
 		PA_WARN("%s, accelerated renderer unavailable: %s\n", __func__, SDL_GetError());
-		renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
+		renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_SOFTWARE);
 	}
 	if (!renderer) {
-		PA_ERROR("%s, failed to create accelerated renderer: %s\n", __func__, SDL_GetError());
+		PA_ERROR("%s, failed to create renderer: %s\n", __func__, SDL_GetError());
 		return -1;
 	}
 
@@ -530,6 +551,18 @@ static int plat_sdl_recreate_renderer(void)
 		SDL_DestroyRenderer(renderer);
 		renderer = NULL;
 	}
+
+	plat_sdl_reset_renderer_state();
+	if (plat_sdl_create_renderer() == 0)
+		return 0;
+
+	PA_WARN("%s, recreating SDL window and renderer\n", __func__);
+	if (window) {
+		SDL_DestroyWindow(window);
+		window = NULL;
+	}
+	if (plat_sdl_create_window())
+		return -1;
 
 	plat_sdl_reset_renderer_state();
 	return plat_sdl_create_renderer();
@@ -689,12 +722,8 @@ finish:
 
 static void plat_sound_pause(void)
 {
-	SDL_PauseAudio(1);
-}
-
-static void plat_sound_resume(void)
-{
 	SDL_LockAudio();
+	audio.paused = true;
 	if (audio.buf && audio.buf_len) {
 		memset(audio.buf, 0, audio.buf_len * sizeof(struct audio_frame));
 		audio.buf_w = 0;
@@ -702,7 +731,15 @@ static void plat_sound_resume(void)
 		audio.max_buf_w = audio.buf_len - 1;
 	}
 	SDL_UnlockAudio();
-	SDL_PauseAudio(0);
+}
+
+static void plat_sound_resume(void)
+{
+	plat_sound_resize_buffer();
+	plat_sound_select_resampler();
+	SDL_LockAudio();
+	audio.paused = false;
+	SDL_UnlockAudio();
 }
 
 static void *fb_flip(void)
@@ -1119,7 +1156,7 @@ finish:
 static void plat_sound_callback(void *unused, uint8_t *stream, int len)
 {
 	int16_t *p = (int16_t *)stream;
-	if (audio.buf_len == 0) {
+	if (audio.buf_len == 0 || audio.paused) {
 		memset(stream, 0, len);
 		return;
 	}
@@ -1166,8 +1203,8 @@ static int plat_sound_init(void)
 
 	spec.freq = MIN(requested_sample_rate, MAX_SAMPLE_RATE);
 	spec.format = AUDIO_S16;
-	spec.channels = 1;
-	spec.samples = 8192;
+	spec.channels = 2;
+	spec.samples = 4096;
 	spec.callback = plat_sound_callback;
 
 	if (SDL_OpenAudio(&spec, &received) < 0) {
@@ -1179,6 +1216,7 @@ static int plat_sound_init(void)
 	audio.out_sample_rate = received.freq;
 	audio.sample_rate_adj = audio.out_sample_rate * DRC_MAX_ADJUSTMENT;
 	audio.adj_out_sample_rate = audio.out_sample_rate;
+	audio.paused = false;
 
 	plat_sound_select_resampler();
 	plat_sound_resize_buffer();
@@ -1344,20 +1382,8 @@ int plat_init(void)
 		return -1;
 	}
 
-	window = SDL_CreateWindow("picoarch",
-	                          SDL_WINDOWPOS_CENTERED,
-	                          SDL_WINDOWPOS_CENTERED,
-	                          SCREEN_WIDTH,
-	                          SCREEN_HEIGHT,
-#ifdef H150101
-	                          SDL_WINDOW_SHOWN | SDL_WINDOW_FULLSCREEN_DESKTOP);
-#else
-	                          SDL_WINDOW_SHOWN);
-#endif
-	if (!window) {
-		PA_ERROR("%s, failed to create window: %s\n", __func__, SDL_GetError());
+	if (plat_sdl_create_window())
 		return -1;
-	}
 
 	if (plat_sdl_create_renderer())
 		return -1;
