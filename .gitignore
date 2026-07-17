@@ -9,6 +9,7 @@ picoarch
 /pkg
 /profile
 /system
+/.worktrees
 
 /bluemsx
 /dosbox-pure
