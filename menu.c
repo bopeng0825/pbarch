@@ -168,8 +168,8 @@ static const char *mgn_zoom_level(int id, int *offs)
 #endif
 
 static void draw_src_bg(void) {
-	memcpy(g_menubg_ptr, g_menubg_src_ptr, g_menubg_src_h * g_menubg_src_pp * sizeof(uint16_t));
-	menu_darken_bg(g_menubg_ptr, g_menubg_src_ptr, g_menubg_src_h * g_menubg_src_pp, 0);
+	memset(g_menubg_ptr, 0,
+	       g_menuscreen_w * g_menuscreen_h * sizeof(uint16_t));
 }
 
 static int mh_set_core(int id, int keys) {

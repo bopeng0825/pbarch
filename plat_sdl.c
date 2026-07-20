@@ -38,9 +38,6 @@ static size_t screen_last_log_pitch;
 static uint16_t screen_pixels[SCREEN_WIDTH * SCREEN_HEIGHT];
 static uint16_t *hud_frame_pixels;
 static size_t hud_frame_pixels_len;
-static unsigned hud_frame_width;
-static unsigned hud_frame_height;
-static size_t hud_frame_pitch;
 static SDL_Surface *screen;
 
 struct sdl_video_profile {
@@ -67,9 +64,12 @@ struct sdl_video_profile {
 	uint32_t audio_wait_frame_max_us;
 	uint32_t pace_max_us;
 	unsigned late_present_frames;
+	unsigned audio_occupancy_min;
+	unsigned audio_occupancy_samples;
 };
 
 static struct sdl_video_profile sdl_video_profile;
+static SDL_atomic_t audio_underruns;
 static uint64_t sdl_flip_start_us;
 #else
 static SDL_Surface* screen;
@@ -162,6 +162,12 @@ static void plat_sdl_profile_frame(void)
 	if (elapsed >= 1000000 && sdl_video_profile.frames) {
 		double frames = (double)sdl_video_profile.frames;
 		double secs = (double)elapsed / 1000000.0;
+		int underruns = SDL_AtomicGet(&audio_underruns);
+		unsigned occupancy_min = sdl_video_profile.audio_occupancy_samples
+			? sdl_video_profile.audio_occupancy_min : 0;
+
+		if (underruns)
+			SDL_AtomicAdd(&audio_underruns, -underruns);
 
 		PA_INFO("PROFILE sdl: fps=%.1f update=%.2f/%u clear=%.2f/%u copy=%.2f/%u pre_present=%.2f/%u late=%u present=%.2f/%u readback=%.2f/%u hud=%.2f/%u audio_wait=%.2f/%u ms avg/max\n",
 			frames / secs,
@@ -182,11 +188,13 @@ static void plat_sdl_profile_frame(void)
 			sdl_video_profile.hud_max_us / 1000,
 			(double)sdl_video_profile.audio_wait_us / frames / 1000.0,
 			sdl_video_profile.audio_wait_max_us / 1000);
-		PA_INFO("PROFILE sdl2: pace=%.2f/%u audio_wait_frame=%.2f/%u ms avg/max\n",
+		PA_INFO("PROFILE sdl2: pace=%.2f/%u audio_wait_frame=%.2f/%u ms avg/max underruns=%d occupancy_min=%u%%\n",
 			(double)sdl_video_profile.pace_us / frames / 1000.0,
 			sdl_video_profile.pace_max_us / 1000,
 			(double)sdl_video_profile.audio_wait_us / frames / 1000.0,
-			sdl_video_profile.audio_wait_frame_max_us / 1000);
+			sdl_video_profile.audio_wait_frame_max_us / 1000,
+			underruns,
+			occupancy_min);
 
 		memset(&sdl_video_profile, 0, sizeof(sdl_video_profile));
 		sdl_video_profile.last_log_us = now;
@@ -625,22 +633,25 @@ static int plat_sdl_ensure_screen_texture(unsigned width, unsigned height,
 	return 0;
 }
 
-static void plat_sdl_readback_screen(void)
+static int plat_sdl_readback_screen(void)
 {
 	uint64_t start_us;
+	int ret;
 
 	if (!renderer)
-		return;
+		return -1;
 
 	start_us = plat_get_ticks_us_u64();
-	if (SDL_RenderReadPixels(renderer, NULL, SDL_PIXELFORMAT_RGB565,
-				 screen_pixels, SCREEN_PITCH) != 0) {
+	ret = SDL_RenderReadPixels(renderer, NULL, SDL_PIXELFORMAT_RGB565,
+				   screen_pixels, SCREEN_PITCH);
+	if (ret != 0) {
 		PA_WARN("%s, SDL_RenderReadPixels failed: %s\n",
 			__func__, SDL_GetError());
 	}
 	plat_sdl_profile_add(&sdl_video_profile.readback_us,
 			     &sdl_video_profile.readback_max_us,
 			     plat_get_ticks_us_u64() - start_us);
+	return ret;
 }
 #endif
 
@@ -677,7 +688,9 @@ static int plat_sdl_update_rgb565_texture(const void *data, unsigned width,
 	uint64_t start_us = plat_get_ticks_us_u64();
 	int ret;
 
-	if (pitch >= width * sizeof(uint16_t)) {
+	if (!msg[0] || pitch < width * sizeof(uint16_t)) {
+		ret = SDL_UpdateTexture(screen_texture, NULL, data, (int)pitch);
+	} else {
 		size_t needed = (size_t)width * height;
 		uint16_t *dst;
 
@@ -699,20 +712,10 @@ static int plat_sdl_update_rgb565_texture(const void *data, unsigned width,
 			       (const uint8_t *)data + (size_t)y * pitch,
 			       width * sizeof(uint16_t));
 		}
-		hud_frame_width = width;
-		hud_frame_height = height;
-		hud_frame_pitch = width * sizeof(uint16_t);
-
-		if (msg[0]) {
-			video_clear_msg(dst, height, width);
-			video_print_msg_aligned(dst, height, width, msg);
-			ret = SDL_UpdateTexture(screen_texture, NULL, dst,
-							(int)hud_frame_pitch);
-		} else {
-			ret = SDL_UpdateTexture(screen_texture, NULL, data, (int)pitch);
-		}
-	} else {
-		ret = SDL_UpdateTexture(screen_texture, NULL, data, (int)pitch);
+		video_clear_msg(dst, height, width);
+		video_print_msg_aligned(dst, height, width, msg);
+		ret = SDL_UpdateTexture(screen_texture, NULL, dst,
+					(int)(width * sizeof(uint16_t)));
 	}
 
 finish:
@@ -896,17 +899,10 @@ void plat_video_menu_enter(int is_rom_loaded)
 
 	plat_sound_pause();
 
+	memset(g_menubg_src_ptr, 0,
+	       g_menubg_src_h * g_menubg_src_pp * sizeof(uint16_t));
+
 #ifdef USE_SDL2
-	if (screen_use_hw_scaling) {
-		if (hud_frame_pixels && hud_frame_width && hud_frame_height) {
-			memset(screen_pixels, 0, sizeof(screen_pixels));
-			scale(hud_frame_width, hud_frame_height, hud_frame_pitch,
-			      hud_frame_pixels, screen_pixels);
-		} else {
-			memset(screen_pixels, 0, sizeof(screen_pixels));
-		}
-	}
-	memcpy(g_menubg_src_ptr, screen_pixels, g_menubg_src_h * g_menubg_src_pp * sizeof(uint16_t));
 	/* Menu draws into screen_pixels; force fb_flip() to upload that full-screen buffer instead of reusing the game texture. */
 	if (plat_sdl_ensure_screen_texture(SCREEN_WIDTH, SCREEN_HEIGHT,
 					       SCREEN_PITCH, SDL_PIXELFORMAT_RGB565,
@@ -915,10 +911,6 @@ void plat_video_menu_enter(int is_rom_loaded)
 		screen_last_dst_rect_valid = false;
 		need_full_clear = 1;
 	}
-#else
-	SDL_LockSurface(screen);
-	memcpy(g_menubg_src_ptr, screen->pixels, g_menubg_src_h * g_menubg_src_pp * sizeof(uint16_t));
-	SDL_UnlockSurface(screen);
 #endif
 	g_menuscreen_ptr = fb_flip();
 }
@@ -1161,6 +1153,9 @@ finish:
 static void plat_sound_callback(void *unused, uint8_t *stream, int len)
 {
 	int16_t *p = (int16_t *)stream;
+#ifdef USE_SDL2
+	bool underrun = false;
+#endif
 	if (audio.buf_len == 0 || audio.paused) {
 		memset(stream, 0, len);
 		return;
@@ -1180,10 +1175,17 @@ static void plat_sound_callback(void *unused, uint8_t *stream, int len)
 	}
 
 	while(len > 0) {
+#ifdef USE_SDL2
+		underrun = true;
+#endif
 		*p++ = 0;
 		*p++ = 0;
 		--len;
 	}
+#ifdef USE_SDL2
+	if (underrun)
+		SDL_AtomicAdd(&audio_underruns, 1);
+#endif
 }
 
 static void plat_sound_finish(void)
@@ -1216,6 +1218,9 @@ static int plat_sound_init(void)
 		plat_sound_finish();
 		return -1;
 	}
+	PA_INFO("SDL audio: requested=%dHz/S16/stereo received=%dHz/0x%x/%u-channel/%u-samples\n",
+		spec.freq, received.freq, received.format,
+		received.channels, received.samples);
 
 	audio.in_sample_rate = requested_sample_rate;
 	audio.out_sample_rate = received.freq;
@@ -1242,7 +1247,14 @@ int plat_sound_occupancy(void)
 			(audio.buf_w + audio.buf_len) - audio.buf_r;
 	}
 
-	return buffered * 100 / audio.buf_len;
+	buffered = buffered * 100 / audio.buf_len;
+#ifdef USE_SDL2
+	if (!sdl_video_profile.audio_occupancy_samples ||
+	    (unsigned)buffered < sdl_video_profile.audio_occupancy_min)
+		sdl_video_profile.audio_occupancy_min = buffered;
+	sdl_video_profile.audio_occupancy_samples++;
+#endif
+	return buffered;
 }
 
 #define BATCH_SIZE 100
@@ -1399,9 +1411,6 @@ int plat_init(void)
 	plat_sdl_reset_renderer_state();
 	hud_frame_pixels = NULL;
 	hud_frame_pixels_len = 0;
-	hud_frame_width = 0;
-	hud_frame_height = 0;
-	hud_frame_pitch = 0;
 
 	screen = SDL_CreateRGBSurfaceFrom(screen_pixels,
 	                                  SCREEN_WIDTH,
@@ -1477,9 +1486,6 @@ void plat_finish(void)
 	free(hud_frame_pixels);
 	hud_frame_pixels = NULL;
 	hud_frame_pixels_len = 0;
-	hud_frame_width = 0;
-	hud_frame_height = 0;
-	hud_frame_pitch = 0;
 	if (renderer)
 		SDL_DestroyRenderer(renderer);
 	if (window)

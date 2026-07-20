@@ -35,7 +35,7 @@ static const struct in_default_bind in_h150101_sdl2_defbinds[] = {
     { H150101_SDL2_BUTTON(8),    IN_BINDTYPE_PLAYER12, RETRO_DEVICE_ID_JOYPAD_SELECT },
     { H150101_SDL2_BUTTON(9),    IN_BINDTYPE_PLAYER12, RETRO_DEVICE_ID_JOYPAD_START },
 
-    //{ H150101_SDL2_BUTTON(10),   IN_BINDTYPE_EMU, EACTION_MENU },
+    { H150101_SDL2_BUTTON(10),   IN_BINDTYPE_EMU, EACTION_MENU },
     { 0, 0, 0 }
 };
 
@@ -76,7 +76,7 @@ const struct menu_keymap in_h150101_sdl2_joy_map[] = {
     { H150101_SDL2_BUTTON(3),    PBTN_MA3 },
     { H150101_SDL2_BUTTON(4),    PBTN_L },
     { H150101_SDL2_BUTTON(5),    PBTN_R },
-    //{ H150101_SDL2_BUTTON(10),   PBTN_MENU },
+    { H150101_SDL2_BUTTON(10),   PBTN_MENU },
 };
 
 const struct menu_keymap in_evdev_key_map[] = {

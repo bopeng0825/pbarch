@@ -3,6 +3,7 @@
 *.so
 *.opk
 *.zip
+*.md
 compile_commands.json
 picoarch
 /.cache
