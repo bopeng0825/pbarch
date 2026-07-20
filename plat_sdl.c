@@ -13,6 +13,7 @@
 #include "plat.h"
 #include "scale.h"
 #include "util.h"
+#include "video.h"
 
 #ifdef USE_SDL2
 static SDL_Window *window;
@@ -256,25 +257,27 @@ static void video_print_msg_aligned(uint16_t *dst, uint32_t h, uint32_t pitch, c
 }
 #endif
 #ifdef USE_SDL2
-static bool plat_sdl_is_hw_scale_supported(unsigned width, unsigned height, size_t pitch)
+static Uint32 plat_sdl_texture_format(enum retro_pixel_format format)
 {
-	if (rotate_display)
-		return false;
-
-	if (width == 0 || height == 0 || pitch == 0)
-		return false;
-
-	if (pitch != width * sizeof(uint16_t) &&
-	    pitch != width * sizeof(uint32_t))
-		return false;
-
-	return true;
+	switch (format) {
+	case RETRO_PIXEL_FORMAT_RGB565:
+		return SDL_PIXELFORMAT_RGB565;
+	case RETRO_PIXEL_FORMAT_XRGB8888:
+		return SDL_PIXELFORMAT_XRGB8888;
+	default:
+		return SDL_PIXELFORMAT_UNKNOWN;
+	}
 }
 
-static Uint32 plat_sdl_texture_format_for_pitch(unsigned width, size_t pitch)
+static bool plat_sdl_is_hw_scale_supported(unsigned width, unsigned height,
+					    size_t pitch,
+					    enum retro_pixel_format format)
 {
-	return (pitch == width * sizeof(uint32_t)) ?
-		SDL_PIXELFORMAT_XRGB8888 : SDL_PIXELFORMAT_RGB565;
+	if (rotate_display || height == 0)
+		return false;
+
+	return plat_sdl_texture_format(format) != SDL_PIXELFORMAT_UNKNOWN &&
+	       video_pitch_is_valid(format, width, pitch);
 }
 
 static void plat_sdl_compute_hw_rects(unsigned width, unsigned height,
@@ -982,9 +985,11 @@ void plat_video_process(const void *data, unsigned width, unsigned height, size_
 	uint16_t *pixels = screen_pixels;
 	unsigned screen_h = SCREEN_HEIGHT;
 	unsigned screen_pitch = SCREEN_WIDTH;
-	bool want_hw_scaling = plat_sdl_is_hw_scale_supported(width, height, pitch);
+	enum retro_pixel_format pixel_format = video_get_pixel_format();
+	bool want_hw_scaling = plat_sdl_is_hw_scale_supported(
+		width, height, pitch, pixel_format);
 	bool want_linear = (scale_filter != SCALE_FILTER_NEAREST);
-	Uint32 texture_format = plat_sdl_texture_format_for_pitch(width, pitch);
+	Uint32 texture_format = plat_sdl_texture_format(pixel_format);
 #else
 	SDL_LockSurface(screen);
 	uint16_t *pixels = screen->pixels;

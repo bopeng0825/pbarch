@@ -48,6 +48,28 @@ void video_set_pixel_format(enum retro_pixel_format format) {
 	screen_def.pixel_format = format;
 }
 
+enum retro_pixel_format video_get_pixel_format(void) {
+	return screen_def.pixel_format;
+}
+
+bool video_pitch_is_valid(enum retro_pixel_format format,
+			  unsigned width, size_t pitch) {
+	size_t bytes_per_pixel;
+
+	switch (format) {
+	case RETRO_PIXEL_FORMAT_RGB565:
+		bytes_per_pixel = sizeof(uint16_t);
+		break;
+	case RETRO_PIXEL_FORMAT_XRGB8888:
+		bytes_per_pixel = sizeof(uint32_t);
+		break;
+	default:
+		return false;
+	}
+
+	return width > 0 && pitch >= (size_t)width * bytes_per_pixel;
+}
+
 void video_process(const void *data, unsigned width, unsigned height, size_t pitch) {
 	const uint32_t *input = data;
 	uint16_t *output = screen_def.buffer;
@@ -79,4 +101,3 @@ void video_deinit(void) {
 	free(screen_def.buffer);
 	screen_def.buffer = NULL;
 }
-
