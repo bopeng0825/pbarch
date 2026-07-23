@@ -228,3 +228,27 @@ Follow-up inspection confirmed:
 - software fallback counts only when its actual `SDL_UpdateTexture()` runs;
 - menu and resource recreation clear validity and gameplay attribution; and
 - SDL1 remains isolated from SDL2-only validity state.
+
+## Second review fix
+
+The re-review found that `fb_flip()` treated a menu-only texture update as a
+validating gameplay upload. A new contract assertion first failed with:
+
+```text
+menu-only upload must not validate an invalid gameplay texture
+```
+
+`fb_flip()` now gates both recovery of persistent direct-texture validity and
+the `upload_frames` increment on `gameplay_upload_pending`. The SDL texture is
+still updated for menu rendering, but that menu-only operation cannot make a
+previously rejected gameplay texture eligible for a later duplicate callback.
+
+The permitted recovery transitions are now exactly:
+
+- an exact direct callback accepted by `plat_video_process_direct()`;
+- a hardware or software full gameplay upload; or
+- resource recreation/reset.
+
+Menu entry clears gameplay attribution before its upload. When it reuses an
+existing texture rather than recreating one, persistent invalidity remains
+unchanged. Fresh source-contract and whitespace checks pass after this change.

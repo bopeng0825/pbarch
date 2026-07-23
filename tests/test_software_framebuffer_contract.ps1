@@ -41,6 +41,7 @@ if (-not $flipBody.Success) {
 }
 Require-Pattern $flipBody.Groups["body"].Value "gameplay_upload_pending" "fb_flip does not distinguish gameplay from menu uploads"
 Require-Pattern $flipBody.Groups["body"].Value "upload_frames\+\+" "fb_flip does not count software-scaled gameplay uploads"
+Require-Pattern $flipBody.Groups["body"].Value "if\s*\(\s*gameplay_upload_pending\s*\)\s*\{\s*\r?\n\s*video_direct_validity_upload\s*\(\s*&direct_validity\s*\)" "menu-only upload must not validate an invalid gameplay texture"
 
 $directBody = [regex]::Match($plat, "void\s+plat_video_process_direct\s*\([^)]*\)\s*\{(?<body>.*?)\n\}", "Singleline")
 if (-not $directBody.Success) {

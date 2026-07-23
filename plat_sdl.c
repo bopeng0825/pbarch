@@ -810,13 +810,15 @@ static void *fb_flip(void)
 		if (profile_is_enabled())
 			start_us = plat_get_ticks_us_u64();
 		SDL_UpdateTexture(screen_texture, NULL, screen_pixels, SCREEN_PITCH);
-		video_direct_validity_upload(&direct_validity);
+		if (gameplay_upload_pending) {
+			video_direct_validity_upload(&direct_validity);
+			if (profile_is_enabled())
+				sdl_video_profile.upload_frames++;
+		}
 		if (profile_is_enabled()) {
 			plat_sdl_profile_add(&sdl_video_profile.update_us,
 					     &sdl_video_profile.update_max_us,
 					     plat_get_ticks_us_u64() - start_us);
-			if (gameplay_upload_pending)
-				sdl_video_profile.upload_frames++;
 		}
 		gameplay_upload_pending = false;
 	}
