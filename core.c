@@ -734,10 +734,14 @@ static bool pa_environment(unsigned cmd, void *data) {
 }
 
 static void pa_video_refresh(const void *data, unsigned width, unsigned height, size_t pitch) {
-	uint64_t start_us = core_profile_ticks_us();
+	bool profiling = profile_is_enabled();
+	uint64_t start_us;
 
 	if (should_quit)
 		return;
+
+	if (profiling)
+		start_us = core_profile_ticks_us();
 
 	if (core_profile_should_skip_video())
 		goto finish;
@@ -750,38 +754,53 @@ static void pa_video_refresh(const void *data, unsigned width, unsigned height, 
 	}
 
 finish:
-	core_frame_video_us += core_profile_ticks_us() - start_us;
-	core_frame_video_calls++;
+	if (profiling) {
+		core_frame_video_us += core_profile_ticks_us() - start_us;
+		core_frame_video_calls++;
+	}
 }
 
 static void pa_audio_sample(int16_t left, int16_t right) {
-	uint64_t start_us = core_profile_ticks_us();
+	bool profiling = profile_is_enabled();
+	uint64_t start_us;
 	const struct audio_frame frame = { .left = left, .right = right };
 
+	if (profiling)
+		start_us = core_profile_ticks_us();
 	if (!should_quit && enable_audio)
 		plat_sound_write(&frame, 1);
-	core_frame_audio_us += core_profile_ticks_us() - start_us;
-	core_frame_audio_calls++;
-	core_frame_audio_frames++;
+	if (profiling) {
+		core_frame_audio_us += core_profile_ticks_us() - start_us;
+		core_frame_audio_calls++;
+		core_frame_audio_frames++;
+	}
 }
 
 static size_t pa_audio_sample_batch(const int16_t *data, size_t frames) {
-	uint64_t start_us = core_profile_ticks_us();
+	bool profiling = profile_is_enabled();
+	uint64_t start_us;
 
+	if (profiling)
+		start_us = core_profile_ticks_us();
 	if (!should_quit && enable_audio)
 		plat_sound_write((const struct audio_frame *)data, frames);
-	core_frame_audio_us += core_profile_ticks_us() - start_us;
-	core_frame_audio_calls++;
-	core_frame_audio_frames += frames;
+	if (profiling) {
+		core_frame_audio_us += core_profile_ticks_us() - start_us;
+		core_frame_audio_calls++;
+		core_frame_audio_frames += frames;
+	}
 	return frames;
 }
 
 static void pa_input_poll(void) {
-	uint64_t start_us = core_profile_ticks_us();
+	bool profiling = profile_is_enabled();
+	uint64_t start_us;
 	int actions[IN_BINDTYPE_COUNT] = { 0, };
 	unsigned int emu_act;
 	int which = EACTION_NONE;
 
+	if (profiling)
+		start_us = core_profile_ticks_us();
 	in_update(actions);
 	emu_act = actions[IN_BINDTYPE_EMU];
 	if (emu_act) {
@@ -793,18 +812,22 @@ static void pa_input_poll(void) {
 
 	buttons = actions[IN_BINDTYPE_PLAYER12];
 	polled = 1;
-	core_frame_input_poll_us += core_profile_ticks_us() - start_us;
-	core_frame_input_poll_calls++;
+	if (profiling) {
+		core_frame_input_poll_us += core_profile_ticks_us() - start_us;
+		core_frame_input_poll_calls++;
+	}
 }
 
 static int16_t pa_input_state(unsigned port, unsigned device, unsigned index, unsigned id) {
+	bool profiling = profile_is_enabled();
 	uint64_t start_us;
 	int16_t ret = 0;
 
 	if (port == 0 && device == RETRO_DEVICE_JOYPAD && index == 0 && !polled)
 		pa_input_poll();
 
-	start_us = core_profile_ticks_us();
+	if (profiling)
+		start_us = core_profile_ticks_us();
 	if (port == 0 && device == RETRO_DEVICE_JOYPAD && index == 0) {
 		if (id == RETRO_DEVICE_ID_JOYPAD_MASK)
 			ret = buttons;
@@ -812,8 +835,10 @@ static int16_t pa_input_state(unsigned port, unsigned device, unsigned index, un
 			ret = (buttons >> id) & 1;
 	}
 
-	core_frame_input_state_us += core_profile_ticks_us() - start_us;
-	core_frame_input_state_calls++;
+	if (profiling) {
+		core_frame_input_state_us += core_profile_ticks_us() - start_us;
+		core_frame_input_state_calls++;
+	}
 	return ret;
 }
 
