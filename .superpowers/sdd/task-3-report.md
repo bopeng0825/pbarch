@@ -136,3 +136,95 @@ make DEBUG=1
 Device validation should additionally cover a direct-capable RGB565 core, an
 upload-only core, HUD display, menu enter/leave, duplicate frames, and a
 runtime resolution change.
+
+## Review fixes
+
+The review in `task-3-review.md` identified two Important issues and one
+Minor issue. All three were addressed in a follow-up RED/GREEN cycle.
+
+### Follow-up RED
+
+The source contract was extended to require persistent texture validity,
+duplicate suppression, and software-scaled gameplay upload accounting. Its
+first run failed with:
+
+```text
+an offered texture is not invalidated before returning it to the core
+```
+
+The pure-C `test_video_direct.c` now also encodes these sequences:
+
+1. a valid texture is offered, then receives a NULL/no callback;
+2. the next duplicate remains suppressed across the frame boundary;
+3. an exact direct acceptance restores duplicate eligibility;
+4. another offer invalidates it again;
+5. a full upload restores eligibility; and
+6. resource reset invalidates it.
+
+The C test could not be compiled in this sandbox because no C compiler is
+installed, but it exercises production functions rather than a test-only
+model.
+
+### Follow-up GREEN
+
+Fresh execution of:
+
+```powershell
+.\tests\test_software_framebuffer_contract.ps1
+```
+
+prints `software framebuffer source contract: PASS`, and
+`git diff --check` exits zero.
+
+### Persistent validity lifecycle
+
+`struct video_direct_validity` is intentionally separate from the per-frame
+offer/match state. Calling `video_direct_begin()` or `video_direct_end()` does
+not reset it, so an unaccepted write remains invalid across later frames.
+
+- Locking and offering a texture invalidates its visible contents
+  immediately, because the core may write before any callback.
+- An exact direct callback accepts and validates those contents.
+- A NULL callback does not validate them; `plat_video_dupe()` therefore
+  leaves `frame_dirty` unchanged.
+- A missing callback reaches frame end with validity still false. A later
+  duplicate is also suppressed.
+- A full hardware upload validates the texture immediately.
+- A software-scaled frame validates the pending full-screen contents and
+  uploads them in `fb_flip()` before presentation.
+- Texture/resource destruction resets validity and pending-upload state.
+- Menu entry explicitly clears gameplay upload attribution, while the menu
+  upload itself still updates the texture normally.
+
+This is minimal state tracking rather than a second texture. It cannot restore
+the previous bytes after a rejected offer, so it deliberately suppresses
+duplicates until a successful direct callback or ordinary full upload
+establishes known-good contents, matching the requested persistent-invalid
+semantics.
+
+### Profiling correction
+
+Software-scaled gameplay frames set `gameplay_upload_pending`. When
+`fb_flip()` executes their `SDL_UpdateTexture()`, it increments
+`upload_frames` only if profiling is enabled, then clears the marker.
+Menu-only calls never set this marker, and menu entry clears any stale marker,
+so they are excluded from the gameplay metric.
+
+Hardware RGB565 and XRGB8888 uploads retain their existing guarded increments.
+Thus all gameplay `SDL_UpdateTexture()` submission paths now contribute once.
+
+### Warning correction and follow-up self-review
+
+The SDL2 direct processing function now checks `pitch` against the matched
+offer invariant before accepting the texture, resolving the unused-parameter
+warning without discarding useful validation.
+
+Follow-up inspection confirmed:
+
+- an unmatched non-NULL callback still unlocks before ordinary upload;
+- NULL and missing callbacks remain invalid after frame-end unlock;
+- no invalid duplicate sets `frame_dirty`;
+- direct acceptance happens before the existing present/pacing phase;
+- software fallback counts only when its actual `SDL_UpdateTexture()` runs;
+- menu and resource recreation clear validity and gameplay attribution; and
+- SDL1 remains isolated from SDL2-only validity state.

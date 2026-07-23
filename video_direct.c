@@ -38,3 +38,28 @@ void video_direct_end(struct video_direct_state *state)
 {
 	memset(state, 0, sizeof(*state));
 }
+
+void video_direct_validity_offer(struct video_direct_validity *state)
+{
+	state->valid = false;
+}
+
+void video_direct_validity_accept(struct video_direct_validity *state)
+{
+	state->valid = true;
+}
+
+void video_direct_validity_upload(struct video_direct_validity *state)
+{
+	state->valid = true;
+}
+
+void video_direct_validity_reset(struct video_direct_validity *state)
+{
+	state->valid = false;
+}
+
+bool video_direct_validity_can_dupe(const struct video_direct_validity *state)
+{
+	return state->valid;
+}

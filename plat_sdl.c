@@ -45,9 +45,11 @@ static uint16_t *hud_frame_pixels;
 static size_t hud_frame_pixels_len;
 static SDL_Surface *screen;
 static struct video_direct_state direct_state;
+static struct video_direct_validity direct_validity;
 static bool direct_texture_locked;
 static bool direct_attempted;
 static int direct_status;
+static bool gameplay_upload_pending;
 
 struct sdl_video_profile {
 	unsigned frames;
@@ -585,6 +587,8 @@ static void plat_sdl_destroy_screen_texture(void)
 		screen_texture = NULL;
 	}
 	screen_texture_ready = false;
+	video_direct_validity_reset(&direct_validity);
+	gameplay_upload_pending = false;
 	screen_tex_format = 0;
 	screen_tex_w = 0;
 	screen_tex_h = 0;
@@ -667,6 +671,7 @@ static int plat_sdl_ensure_screen_texture(unsigned width, unsigned height,
 	screen_tex_pitch = pitch;
 	screen_texture_linear = linear;
 	screen_texture_ready = true;
+	video_direct_validity_reset(&direct_validity);
 	return 0;
 }
 
@@ -796,17 +801,24 @@ static void *fb_flip(void)
 #ifdef USE_SDL2
 	uint64_t start_us;
 
-	if (!screen_texture_ready)
+	if (!screen_texture_ready) {
+		gameplay_upload_pending = false;
 		return screen_pixels;
+	}
 
 	if (!screen_use_hw_scaling) {
 		if (profile_is_enabled())
 			start_us = plat_get_ticks_us_u64();
 		SDL_UpdateTexture(screen_texture, NULL, screen_pixels, SCREEN_PITCH);
-		if (profile_is_enabled())
+		video_direct_validity_upload(&direct_validity);
+		if (profile_is_enabled()) {
 			plat_sdl_profile_add(&sdl_video_profile.update_us,
 					     &sdl_video_profile.update_max_us,
 					     plat_get_ticks_us_u64() - start_us);
+			if (gameplay_upload_pending)
+				sdl_video_profile.upload_frames++;
+		}
+		gameplay_upload_pending = false;
 	}
 
 	if (need_full_clear)
@@ -954,6 +966,7 @@ void plat_video_menu_enter(int is_rom_loaded)
 	       g_menubg_src_h * g_menubg_src_pp * sizeof(uint16_t));
 
 #ifdef USE_SDL2
+	gameplay_upload_pending = false;
 	/* Menu draws into screen_pixels; force fb_flip() to upload that full-screen buffer instead of reusing the game texture. */
 	if (plat_sdl_ensure_screen_texture(SCREEN_WIDTH, SCREEN_HEIGHT,
 					       SCREEN_PITCH, SDL_PIXELFORMAT_RGB565,
@@ -1081,6 +1094,7 @@ bool plat_video_get_software_framebuffer(struct retro_framebuffer *framebuffer)
 	}
 
 	direct_texture_locked = true;
+	video_direct_validity_offer(&direct_validity);
 	framebuffer->data = pixels;
 	framebuffer->pitch = (size_t)locked_pitch;
 	framebuffer->format = RETRO_PIXEL_FORMAT_RGB565;
@@ -1123,7 +1137,11 @@ void plat_video_frame_end(void)
 
 void plat_video_process_direct(unsigned width, unsigned height, size_t pitch)
 {
+	if (pitch != direct_state.pitch)
+		return;
 	frame_dirty = true;
+	video_direct_validity_accept(&direct_validity);
+	gameplay_upload_pending = false;
 	plat_sdl_compute_hw_rects(width, height, &screen_src_rect, &screen_dst_rect);
 	if (!screen_last_dst_rect_valid ||
 	    memcmp(&screen_last_dst_rect, &screen_dst_rect,
@@ -1174,6 +1192,7 @@ void plat_video_process(const void *data, unsigned width, unsigned height, size_
 	static int had_msg = 0;
 	frame_dirty = true;
 #ifdef USE_SDL2
+	gameplay_upload_pending = false;
 	uint16_t *pixels = screen_pixels;
 	unsigned screen_h = SCREEN_HEIGHT;
 	unsigned screen_pitch = SCREEN_WIDTH;
@@ -1220,6 +1239,7 @@ void plat_video_process(const void *data, unsigned width, unsigned height, size_
 				}
 			}
 			screen_use_hw_scaling = true;
+			video_direct_validity_upload(&direct_validity);
 			if (screen_last_log_w != width ||
 			    screen_last_log_h != height ||
 			    screen_last_log_pitch != pitch) {
@@ -1242,6 +1262,10 @@ void plat_video_process(const void *data, unsigned width, unsigned height, size_
 			screen_use_hw_scaling = false;
 		screen_last_dst_rect_valid = false;
 		scale(width, height, pitch, data, pixels);
+	}
+	if (!screen_use_hw_scaling && screen_texture_ready) {
+		video_direct_validity_upload(&direct_validity);
+		gameplay_upload_pending = true;
 	}
 #else
 	scale(width, height, pitch, data, pixels);
@@ -1268,6 +1292,10 @@ void plat_video_process(const void *data, unsigned width, unsigned height, size_
 
 void plat_video_dupe(void)
 {
+#ifdef USE_SDL2
+	if (!video_direct_validity_can_dupe(&direct_validity))
+		return;
+#endif
 	frame_dirty = true;
 }
 
