@@ -11,6 +11,7 @@
 #include "menu.h"
 #include "options.h"
 #include "plat.h"
+#include "profile.h"
 #include "scale.h"
 #include "util.h"
 #include "video.h"
@@ -151,9 +152,13 @@ static void plat_sdl_profile_add(uint64_t *total_us, uint32_t *max_us,
 
 static void plat_sdl_profile_frame(void)
 {
-	uint64_t now = plat_get_ticks_us_u64();
+	uint64_t now;
 	uint64_t elapsed;
 
+	if (!profile_is_enabled())
+		return;
+
+	now = plat_get_ticks_us_u64();
 	if (!sdl_video_profile.last_log_us)
 		sdl_video_profile.last_log_us = now;
 
@@ -641,16 +646,18 @@ static int plat_sdl_readback_screen(void)
 	if (!renderer)
 		return -1;
 
-	start_us = plat_get_ticks_us_u64();
+	if (profile_is_enabled())
+		start_us = plat_get_ticks_us_u64();
 	ret = SDL_RenderReadPixels(renderer, NULL, SDL_PIXELFORMAT_RGB565,
 				   screen_pixels, SCREEN_PITCH);
 	if (ret != 0) {
 		PA_WARN("%s, SDL_RenderReadPixels failed: %s\n",
 			__func__, SDL_GetError());
 	}
-	plat_sdl_profile_add(&sdl_video_profile.readback_us,
-			     &sdl_video_profile.readback_max_us,
-			     plat_get_ticks_us_u64() - start_us);
+	if (profile_is_enabled())
+		plat_sdl_profile_add(&sdl_video_profile.readback_us,
+				     &sdl_video_profile.readback_max_us,
+				     plat_get_ticks_us_u64() - start_us);
 	return ret;
 }
 #endif
@@ -685,9 +692,11 @@ static int audio_resample_nearest(struct audio_frame data) {
 static int plat_sdl_update_rgb565_texture(const void *data, unsigned width,
 						  unsigned height, size_t pitch)
 {
-	uint64_t start_us = plat_get_ticks_us_u64();
+	uint64_t start_us;
 	int ret;
 
+	if (profile_is_enabled())
+		start_us = plat_get_ticks_us_u64();
 	if (!msg[0] || pitch < width * sizeof(uint16_t)) {
 		ret = SDL_UpdateTexture(screen_texture, NULL, data, (int)pitch);
 	} else {
@@ -719,9 +728,10 @@ static int plat_sdl_update_rgb565_texture(const void *data, unsigned width,
 	}
 
 finish:
-	plat_sdl_profile_add(&sdl_video_profile.update_us,
-			     &sdl_video_profile.update_max_us,
-			     plat_get_ticks_us_u64() - start_us);
+	if (profile_is_enabled())
+		plat_sdl_profile_add(&sdl_video_profile.update_us,
+				     &sdl_video_profile.update_max_us,
+				     plat_get_ticks_us_u64() - start_us);
 	return ret;
 }
 #endif
@@ -757,36 +767,42 @@ static void *fb_flip(void)
 		return screen_pixels;
 
 	if (!screen_use_hw_scaling) {
-		start_us = plat_get_ticks_us_u64();
+		if (profile_is_enabled())
+			start_us = plat_get_ticks_us_u64();
 		SDL_UpdateTexture(screen_texture, NULL, screen_pixels, SCREEN_PITCH);
-		plat_sdl_profile_add(&sdl_video_profile.update_us,
-				     &sdl_video_profile.update_max_us,
-				     plat_get_ticks_us_u64() - start_us);
+		if (profile_is_enabled())
+			plat_sdl_profile_add(&sdl_video_profile.update_us,
+					     &sdl_video_profile.update_max_us,
+					     plat_get_ticks_us_u64() - start_us);
 	}
 
 	if (need_full_clear)
 		screen_clear_frames = 3;
 
 	if (!screen_use_hw_scaling || screen_clear_frames > 0) {
-		start_us = plat_get_ticks_us_u64();
+		if (profile_is_enabled())
+			start_us = plat_get_ticks_us_u64();
 		SDL_RenderClear(renderer);
-		plat_sdl_profile_add(&sdl_video_profile.clear_us,
-				     &sdl_video_profile.clear_max_us,
-				     plat_get_ticks_us_u64() - start_us);
+		if (profile_is_enabled())
+			plat_sdl_profile_add(&sdl_video_profile.clear_us,
+					     &sdl_video_profile.clear_max_us,
+					     plat_get_ticks_us_u64() - start_us);
 		if (screen_clear_frames > 0)
 			screen_clear_frames--;
 		need_full_clear = 0;
 	}
 
-	start_us = plat_get_ticks_us_u64();
+	if (profile_is_enabled())
+		start_us = plat_get_ticks_us_u64();
 	SDL_RenderCopy(renderer, screen_texture,
 		      screen_use_hw_scaling ? &screen_src_rect : NULL,
 		      screen_use_hw_scaling ? &screen_dst_rect : NULL);
-	plat_sdl_profile_add(&sdl_video_profile.copy_us,
-			     &sdl_video_profile.copy_max_us,
-			     plat_get_ticks_us_u64() - start_us);
+	if (profile_is_enabled())
+		plat_sdl_profile_add(&sdl_video_profile.copy_us,
+				     &sdl_video_profile.copy_max_us,
+				     plat_get_ticks_us_u64() - start_us);
 
-	if (sdl_flip_start_us) {
+	if (profile_is_enabled() && sdl_flip_start_us) {
 		uint64_t pre_present_us = plat_get_ticks_us_u64() - sdl_flip_start_us;
 
 		plat_sdl_profile_add(&sdl_video_profile.pre_present_us,
@@ -796,11 +812,13 @@ static void *fb_flip(void)
 			sdl_video_profile.late_present_frames++;
 	}
 
-	start_us = plat_get_ticks_us_u64();
+	if (profile_is_enabled())
+		start_us = plat_get_ticks_us_u64();
 	SDL_RenderPresent(renderer);
-	plat_sdl_profile_add(&sdl_video_profile.present_us,
-			     &sdl_video_profile.present_max_us,
-			     plat_get_ticks_us_u64() - start_us);
+	if (profile_is_enabled())
+		plat_sdl_profile_add(&sdl_video_profile.present_us,
+				     &sdl_video_profile.present_max_us,
+				     plat_get_ticks_us_u64() - start_us);
 	plat_sdl_profile_frame();
 	return screen_pixels;
 #else
@@ -1006,14 +1024,16 @@ void plat_video_process(const void *data, unsigned width, unsigned height, size_
 				screen_last_dst_rect_valid = true;
 				screen_clear_frames = 3;
 			}
-			start_us = plat_get_ticks_us_u64();
+			if (profile_is_enabled())
+				start_us = plat_get_ticks_us_u64();
 			if (texture_format == SDL_PIXELFORMAT_RGB565)
 				plat_sdl_update_rgb565_texture(data, width, height, pitch);
 			else {
 				SDL_UpdateTexture(screen_texture, NULL, data, (int)pitch);
-				plat_sdl_profile_add(&sdl_video_profile.update_us,
-						     &sdl_video_profile.update_max_us,
-						     plat_get_ticks_us_u64() - start_us);
+				if (profile_is_enabled())
+					plat_sdl_profile_add(&sdl_video_profile.update_us,
+							     &sdl_video_profile.update_max_us,
+							     plat_get_ticks_us_u64() - start_us);
 			}
 			screen_use_hw_scaling = true;
 			if (screen_last_log_w != width ||
@@ -1073,13 +1093,15 @@ void plat_video_flip(void)
 
 	if (frame_dirty) {
 #ifdef USE_SDL2
-		uint64_t frame_audio_wait_us = sdl_video_profile.audio_wait_frame_us;
+		if (profile_is_enabled()) {
+			uint64_t frame_audio_wait_us = sdl_video_profile.audio_wait_frame_us;
 
-		if (frame_audio_wait_us > sdl_video_profile.audio_wait_frame_max_us)
-			sdl_video_profile.audio_wait_frame_max_us =
-				(frame_audio_wait_us > UINT32_MAX) ? UINT32_MAX : (uint32_t)frame_audio_wait_us;
-		sdl_video_profile.audio_wait_frame_us = 0;
-		sdl_flip_start_us = plat_get_ticks_us_u64();
+			if (frame_audio_wait_us > sdl_video_profile.audio_wait_frame_max_us)
+				sdl_video_profile.audio_wait_frame_max_us =
+					(frame_audio_wait_us > UINT32_MAX) ? UINT32_MAX : (uint32_t)frame_audio_wait_us;
+			sdl_video_profile.audio_wait_frame_us = 0;
+			sdl_flip_start_us = plat_get_ticks_us_u64();
+		}
 #endif
 		if (enable_drc && !screen_renderer_vsync) {
 			uint64_t time = plat_get_ticks_us_u64();
@@ -1087,7 +1109,10 @@ void plat_video_flip(void)
 			if (limit_frames && time < next_frame_time_us) {
 				uint32_t delaytime = (next_frame_time_us - time - 1) / 1000 + 1;
 #ifdef USE_SDL2
-				uint64_t pace_start_us = plat_get_ticks_us_u64();
+				uint64_t pace_start_us;
+
+				if (profile_is_enabled())
+					pace_start_us = plat_get_ticks_us_u64();
 #endif
 
 				if (delaytime < 1000)
@@ -1095,9 +1120,10 @@ void plat_video_flip(void)
 				else
 					next_frame_time_us = 0;
 #ifdef USE_SDL2
-				plat_sdl_profile_add(&sdl_video_profile.pace_us,
-						     &sdl_video_profile.pace_max_us,
-						     plat_get_ticks_us_u64() - pace_start_us);
+				if (profile_is_enabled())
+					plat_sdl_profile_add(&sdl_video_profile.pace_us,
+							     &sdl_video_profile.pace_max_us,
+							     plat_get_ticks_us_u64() - pace_start_us);
 #endif
 
 				time = plat_get_ticks_us_u64();
@@ -1249,10 +1275,12 @@ int plat_sound_occupancy(void)
 
 	buffered = buffered * 100 / audio.buf_len;
 #ifdef USE_SDL2
-	if (!sdl_video_profile.audio_occupancy_samples ||
-	    (unsigned)buffered < sdl_video_profile.audio_occupancy_min)
-		sdl_video_profile.audio_occupancy_min = buffered;
-	sdl_video_profile.audio_occupancy_samples++;
+	if (profile_is_enabled()) {
+		if (!sdl_video_profile.audio_occupancy_samples ||
+		    (unsigned)buffered < sdl_video_profile.audio_occupancy_min)
+			sdl_video_profile.audio_occupancy_min = buffered;
+		sdl_video_profile.audio_occupancy_samples++;
+	}
 #endif
 	return buffered;
 }
@@ -1294,11 +1322,12 @@ void plat_sound_write_resample(const struct audio_frame *data, int frames, int (
 				return;
 
 #ifdef USE_SDL2
-			wait_start_us = plat_get_ticks_us_u64();
+			if (profile_is_enabled())
+				wait_start_us = plat_get_ticks_us_u64();
 #endif
 			plat_sleep_ms(1);
 #ifdef USE_SDL2
-			{
+			if (profile_is_enabled()) {
 				uint64_t wait_us = plat_get_ticks_us_u64() - wait_start_us;
 				plat_sdl_profile_add(&sdl_video_profile.audio_wait_us,
 						     &sdl_video_profile.audio_wait_max_us,

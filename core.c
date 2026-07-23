@@ -15,6 +15,7 @@
 #include "options.h"
 #include "overrides.h"
 #include "plat.h"
+#include "profile.h"
 #include "util.h"
 #include "video.h"
 #include <sys/time.h>
@@ -106,12 +107,16 @@ static void core_profile_add(uint64_t *total_us, uint32_t *max_us,
 
 static void core_profile_finish_frame(uint64_t run_us)
 {
-	uint64_t now = core_profile_ticks_us();
+	uint64_t now;
 	uint64_t cb_us = core_frame_video_us + core_frame_audio_us +
 		core_frame_input_poll_us + core_frame_input_state_us;
 	uint64_t inner_us = run_us > cb_us ? run_us - cb_us : 0;
 	uint64_t elapsed;
 
+	if (!profile_is_enabled())
+		return;
+
+	now = core_profile_ticks_us();
 	if (!core_cb_profile.last_log_us)
 		core_cb_profile.last_log_us = now;
 
@@ -1020,9 +1025,13 @@ void core_run_frame(void) {
 	core_frame_audio_frames = 0;
 	core_frame_input_poll_calls = 0;
 	core_frame_input_state_calls = 0;
-	start_us = core_profile_ticks_us();
-	current_core.retro_run();
-	core_profile_finish_frame(core_profile_ticks_us() - start_us);
+	if (profile_is_enabled()) {
+		start_us = core_profile_ticks_us();
+		current_core.retro_run();
+		core_profile_finish_frame(core_profile_ticks_us() - start_us);
+	} else {
+		current_core.retro_run();
+	}
 }
 
 void core_unload_content(void) {
