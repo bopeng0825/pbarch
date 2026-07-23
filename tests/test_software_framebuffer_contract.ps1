@@ -4,6 +4,7 @@ $root = Split-Path -Parent $PSScriptRoot
 $core = Get-Content -Raw (Join-Path $root "core.c")
 $plat = Get-Content -Raw (Join-Path $root "plat_sdl.c")
 $header = Get-Content -Raw (Join-Path $root "plat.h")
+$direct = Get-Content -Raw (Join-Path $root "video_direct.c")
 
 function Require-Pattern([string]$text, [string]$pattern, [string]$message) {
 	if ($text -notmatch $pattern) {
@@ -18,6 +19,10 @@ Require-Pattern $header "plat_video_frame_end\s*\(" "platform frame-end API is m
 Require-Pattern $core "RETRO_ENVIRONMENT_GET_CURRENT_SOFTWARE_FRAMEBUFFER" "Libretro framebuffer environment command is not wired"
 Require-Pattern $core "(?s)plat_video_frame_begin\s*\(\s*\).*?retro_run\s*\(\s*\).*?plat_video_frame_end\s*\(\s*\)" "retro_run is not enclosed by the direct-frame lifecycle"
 Require-Pattern $core "plat_video_frame_is_direct\s*\(\s*data\s*,\s*width\s*,\s*height\s*,\s*pitch\s*\)" "video callback does not recognize direct frames"
+Require-Pattern $direct "VIDEO_DIRECT_REPEAT" "repeated exact direct callback is not classified"
+Require-Pattern $direct "VIDEO_DIRECT_OFFERED_MISMATCH" "later callbacks using the offered pointer are not classified safely"
+Require-Pattern $plat "result\s*!=\s*VIDEO_DIRECT_EXTERNAL" "offered-pointer callbacks can fall through to upload"
+Require-Pattern $plat "direct_callback_pending" "repeated direct callbacks are not prevented from double-counting"
 Require-Pattern $plat "SDL_GetRendererInfo\s*\(" "renderer capabilities are not queried"
 Require-Pattern $plat "texture_formats" "native RGB565 support is not derived from renderer formats"
 Require-Pattern $plat "SDL_LockTexture\s*\(" "streaming texture is not locked"

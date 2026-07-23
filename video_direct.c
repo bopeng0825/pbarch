@@ -23,15 +23,28 @@ void video_direct_offer(struct video_direct_state *state, void *data,
 bool video_direct_match(struct video_direct_state *state, const void *data,
 			unsigned width, unsigned height, size_t pitch)
 {
-	if (!state->frame_active || !state->offered || state->matched)
-		return false;
+	return video_direct_classify(state, data, width, height, pitch) ==
+		VIDEO_DIRECT_ACCEPT;
+}
 
-	if (state->data != data || state->width != width ||
-	    state->height != height || state->pitch != pitch)
-		return false;
+enum video_direct_result video_direct_classify(
+			struct video_direct_state *state, const void *data,
+			unsigned width, unsigned height, size_t pitch)
+{
+	bool exact;
+
+	if (!state->frame_active || !state->offered || state->data != data)
+		return VIDEO_DIRECT_EXTERNAL;
+
+	exact = state->width == width && state->height == height &&
+		state->pitch == pitch;
+	if (!exact)
+		return VIDEO_DIRECT_OFFERED_MISMATCH;
+	if (state->matched)
+		return VIDEO_DIRECT_REPEAT;
 
 	state->matched = true;
-	return true;
+	return VIDEO_DIRECT_ACCEPT;
 }
 
 void video_direct_end(struct video_direct_state *state)

@@ -50,6 +50,7 @@ static bool direct_texture_locked;
 static bool direct_attempted;
 static int direct_status;
 static bool gameplay_upload_pending;
+static bool direct_callback_pending;
 
 struct sdl_video_profile {
 	unsigned frames;
@@ -1045,6 +1046,7 @@ void plat_video_frame_begin(void)
 	}
 	video_direct_begin(&direct_state);
 	direct_attempted = false;
+	direct_callback_pending = false;
 }
 
 bool plat_video_get_software_framebuffer(struct retro_framebuffer *framebuffer)
@@ -1109,22 +1111,26 @@ bool plat_video_get_software_framebuffer(struct retro_framebuffer *framebuffer)
 bool plat_video_frame_is_direct(const void *data, unsigned width,
 				unsigned height, size_t pitch)
 {
-	bool matched = video_direct_match(&direct_state, data, width, height, pitch);
+	enum video_direct_result result = video_direct_classify(
+		&direct_state, data, width, height, pitch);
+	bool handled = result != VIDEO_DIRECT_EXTERNAL;
 
-	if (matched && direct_status != 1) {
+	direct_callback_pending = result == VIDEO_DIRECT_ACCEPT;
+	if (result == VIDEO_DIRECT_ACCEPT && direct_status != 1) {
 		PA_INFO("SDL direct framebuffer: enabled %ux%u pitch=%zu RGB565\n",
 			width, height, pitch);
 		direct_status = 1;
-	} else if (!matched && data && direct_attempted && direct_status != -1) {
+	} else if (result == VIDEO_DIRECT_EXTERNAL && data &&
+		   direct_attempted && direct_status != -1) {
 		PA_INFO("SDL direct framebuffer: unavailable, using texture upload\n");
 		direct_status = -1;
 	}
-	if (!matched && data && direct_texture_locked) {
+	if (result == VIDEO_DIRECT_EXTERNAL && data && direct_texture_locked) {
 		SDL_UnlockTexture(screen_texture);
 		direct_texture_locked = false;
 		video_direct_end(&direct_state);
 	}
-	return matched;
+	return handled;
 }
 
 void plat_video_frame_end(void)
@@ -1135,12 +1141,14 @@ void plat_video_frame_end(void)
 	}
 	video_direct_end(&direct_state);
 	direct_attempted = false;
+	direct_callback_pending = false;
 }
 
 void plat_video_process_direct(unsigned width, unsigned height, size_t pitch)
 {
-	if (pitch != direct_state.pitch)
+	if (!direct_callback_pending || pitch != direct_state.pitch)
 		return;
+	direct_callback_pending = false;
 	frame_dirty = true;
 	video_direct_validity_accept(&direct_validity);
 	gameplay_upload_pending = false;

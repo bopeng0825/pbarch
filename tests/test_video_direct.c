@@ -37,7 +37,14 @@ int main(void)
 	assert(!video_direct_match(&state, pixels, 320, 240, 642));
 
 	offer(&state, pixels, 320, 240, 640);
-	assert(video_direct_match(&state, pixels, 320, 240, 640));
+	assert(video_direct_classify(&state, pixels, 320, 240, 640) ==
+	       VIDEO_DIRECT_ACCEPT);
+	assert(video_direct_classify(&state, pixels, 320, 240, 640) ==
+	       VIDEO_DIRECT_REPEAT);
+	assert(video_direct_classify(&state, pixels, 319, 240, 640) ==
+	       VIDEO_DIRECT_OFFERED_MISMATCH);
+	assert(video_direct_classify(&state, pixels + 1, 320, 240, 640) ==
+	       VIDEO_DIRECT_EXTERNAL);
 	assert(!video_direct_match(&state, pixels, 320, 240, 640));
 
 	offer(&state, pixels, 320, 240, 640);
