@@ -560,6 +560,9 @@ static bool pa_environment(unsigned cmd, void *data) {
 			*out = true;
 		break;
 	}
+	case RETRO_ENVIRONMENT_GET_CURRENT_SOFTWARE_FRAMEBUFFER:
+		return data && plat_video_get_software_framebuffer(
+			(struct retro_framebuffer *)data);
 	case RETRO_ENVIRONMENT_SET_MESSAGE: { /* 6 */
 		const struct retro_message *message = (const struct retro_message*)data;
 		if (message) {
@@ -746,7 +749,10 @@ static void pa_video_refresh(const void *data, unsigned width, unsigned height, 
 	if (core_profile_should_skip_video())
 		goto finish;
 
-	if (data) {
+	if (plat_video_frame_is_direct(data, width, height, pitch)) {
+		pa_track_render();
+		plat_video_process_direct(width, height, pitch);
+	} else if (data) {
 		pa_track_render();
 		video_process(data, width, height, pitch);
 	} else {
@@ -1052,10 +1058,14 @@ void core_run_frame(void) {
 	core_frame_input_state_calls = 0;
 	if (profile_is_enabled()) {
 		start_us = core_profile_ticks_us();
+		plat_video_frame_begin();
 		current_core.retro_run();
+		plat_video_frame_end();
 		core_profile_finish_frame(core_profile_ticks_us() - start_us);
 	} else {
+		plat_video_frame_begin();
 		current_core.retro_run();
+		plat_video_frame_end();
 	}
 }
 
