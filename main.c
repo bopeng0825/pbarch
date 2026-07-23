@@ -846,18 +846,23 @@ int main(int argc, char **argv) {
 
 	do {
 		unsigned t0, t1, t2, t3, t4;
+		bool profiling = profile_is_enabled();
 
 		if (signal_quit_requested)
 			should_quit = true;
 
 		count_fps();
-		t0 = plat_get_ticks_us();
+		if (profiling)
+			t0 = plat_get_ticks_us();
 		adjust_audio();
-		t1 = plat_get_ticks_us();
+		if (profiling)
+			t1 = plat_get_ticks_us();
 		core_run_frame();
-		t2 = plat_get_ticks_us();
+		if (profiling)
+			t2 = plat_get_ticks_us();
 		perform_emu_action();
-		t3 = plat_get_ticks_us();
+		if (profiling)
+			t3 = plat_get_ticks_us();
 #ifdef FUNKEY_S
 		if (should_suspend) {
 			toggle_fast_forward(1);
@@ -867,8 +872,10 @@ int main(int argc, char **argv) {
 
 		if (!should_quit)
 			plat_video_flip();
-		t4 = plat_get_ticks_us();
-		loop_profile_frame(t1 - t0, t2 - t1, t3 - t2, t4 - t3);
+		if (profiling) {
+			t4 = plat_get_ticks_us();
+			loop_profile_frame(t1 - t0, t2 - t1, t3 - t2, t4 - t3);
+		}
 	} while (!should_quit);
 
 	return quit(0);
