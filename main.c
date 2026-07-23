@@ -13,6 +13,7 @@
 #include "menu.h"
 #include "overrides.h"
 #include "plat.h"
+#include "profile.h"
 #include "util.h"
 
 #ifdef MMENU
@@ -73,9 +74,13 @@ static void loop_profile_add(unsigned *max_us, unsigned long long *total_us,
 static void loop_profile_frame(unsigned adjust_us, unsigned core_us,
 			       unsigned action_us, unsigned flip_us)
 {
-	unsigned now = plat_get_ticks_us();
+	unsigned now;
 	unsigned elapsed;
 
+	if (!profile_is_enabled())
+		return;
+
+	now = plat_get_ticks_us();
 	if (!loop_profile.last_log_us)
 		loop_profile.last_log_us = now;
 
