@@ -1,0 +1,47 @@
+key	en	zh_CN	zh_TW
+on	ON	开	開
+off	OFF	关	關
+resume_game	Resume game	继续游戏	繼續遊戲
+save_state	Save state	保存状态	儲存狀態
+load_state	Load state	读取状态	載入狀態
+disc_control	Disc control	光盘控制	光碟控制
+cheats	Cheats	金手指	作弊碼
+options	Options	选项	選項
+reset_game	Reset game	重置游戏	重設遊戲
+load_new_game	Load new game	载入新游戏	載入新遊戲
+about	About	关于	關於
+exit	Exit	退出	離開
+audio_video	Audio and video	音频和视频	音訊和視訊
+emulator_options	Emulator options	模拟器选项	模擬器選項
+player_controls	Player controls	玩家控制	玩家控制
+emulator_hotkeys	Emulator hotkeys	模拟器快捷键	模擬器快捷鍵
+save_config	Save config	保存配置	儲存設定
+show_fps	Show FPS	显示帧率	顯示幀率
+show_cpu_usage	Show CPU usage	显示 CPU 使用率	顯示 CPU 使用率
+display_mode	Display mode	显示模式	顯示模式
+zoom_level	Zoom level	缩放级别	縮放級別
+screen_panning	Screen panning	屏幕平移	螢幕平移
+screen_rotation	Screen rotation	屏幕旋转	螢幕旋轉
+scaling_filter	Scaling filter	缩放滤镜	縮放濾鏡
+audio_buffer	Audio buffer	音频缓冲	音訊緩衝
+audio_adjustment	Audio adjustment	音频调节	音訊調整
+use_srm_saves	Use .srm saves	使用 .srm 存档	使用 .srm 存檔
+save_global_config	Save global config	保存全局配置	儲存全域設定
+save_game_config	Save game config	保存游戏配置	儲存遊戲設定
+delete_game_config	Delete game config	删除游戏配置	刪除遊戲設定
+restore_defaults	Restore defaults	恢复默认值	還原預設值
+about_to_delete	About to delete	即将删除	即將刪除
+are_you_sure	Are you sure?	确定吗？	確定嗎？
+back	back	返回	返回
+load_failed	Load failed	读取失败	載入失敗
+save_failed	Save failed	保存失败	儲存失敗
+defaults_restored	defaults restored	已恢复默认值	已還原預設值
+config_saved	config saved	配置已保存	設定已儲存
+config_write_failed	failed to write config	配置写入失败	設定寫入失敗
+load_state_title	Load state	读取状态	載入狀態
+save_state_title	Save state	保存状态	儲存狀態
+slot_fmt	SLOT %i (%s)	槽位 %i（%s）	欄位 %i（%s）
+player_controls_fmt	Player %i controls	玩家 %i 控制	玩家 %i 控制
+emulator_controls	Emulator controls	模拟器控制	模擬器控制
+press_bind	Press a button to bind/unbind	按键以绑定或解除绑定	按鍵以綁定或解除綁定
+press_other_device	Press left/right for other devs	按左/右切换设备	按左/右切換裝置
