@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import csv
+import re
 from pathlib import Path
 
 
@@ -9,10 +10,49 @@ SOURCE = ROOT / "locales" / "ui.tsv"
 OUTPUT = ROOT / "ui_catalog_data.h"
 HEADER = ["key", "en", "zh_CN", "zh_TW"]
 FALLBACK_ROW = ["test_english_fallback", "English fallback", "", ""]
+PRINTF_CONVERSION = re.compile(
+	r"%(?:(?P<position>[1-9][0-9]*)\$)?"
+	r"[-+ #0']*"
+	r"(?P<width>\*|\d+)?"
+	r"(?:\.(?P<precision>\*|\d*))?"
+	r"(?P<length>hh|h|ll|l|j|z|t|L)?"
+	r"(?P<conversion>[diouxXfFeEgGaAcspn%])"
+)
 
 
 def c_string(value):
 	return '"' + value.replace("\\", "\\\\").replace('"', '\\"') + '"'
+
+
+def printf_signature(value):
+	signature = []
+	offset = 0
+
+	while True:
+		percent = value.find("%", offset)
+		if percent < 0:
+			break
+		match = PRINTF_CONVERSION.match(value, percent)
+		if match is None:
+			raise ValueError("invalid printf conversion")
+		conversion = match.group("conversion")
+		if conversion == "%":
+			if match.group(0) != "%%":
+				raise ValueError("invalid escaped percent conversion")
+		elif conversion == "n":
+			raise ValueError("forbidden printf conversion: %n")
+		else:
+			position = match.group("position")
+			prefix = (position + "$") if position else ""
+			if match.group("width") == "*":
+				signature.append(prefix + "*")
+			if match.group("precision") == "*":
+				signature.append(prefix + ".*")
+			signature.append(
+				prefix + (match.group("length") or "") + conversion
+			)
+		offset = match.end()
+	return tuple(signature)
 
 
 def read_catalog():
@@ -36,6 +76,16 @@ def read_catalog():
 			raise ValueError("duplicate catalog key: %s" % key)
 		if not english:
 			raise ValueError("missing English text for key: %s" % key)
+		english_signature = printf_signature(english)
+		for language, translation in (
+			("zh_CN", zh_cn),
+			("zh_TW", zh_tw),
+		):
+			if translation and printf_signature(translation) != english_signature:
+				raise ValueError(
+					"printf signature mismatch for %s in %s" %
+					(key, language)
+				)
 		seen.add(key)
 		catalog.append([key, english, zh_cn, zh_tw])
 
