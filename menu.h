@@ -2,6 +2,7 @@
 #define _MENU_H__
 
 #include "config.h"
+#define MENU_TRANSLATION_IDS
 #include "libpicofe/menu.h"
 
 int menu_init(void);

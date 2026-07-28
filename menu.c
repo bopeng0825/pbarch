@@ -2,6 +2,10 @@
 #include "core.h"
 #include "main.h"
 #include "menu.h"
+#include "ui_language.h"
+#ifdef USE_SDL2
+#include "menu_sdl2.h"
+#endif
 #include "options.h"
 #include "overrides.h"
 #include "plat.h"
@@ -15,6 +19,9 @@
 #define PXMAKE(r,g,b) ((((r)<<8) & 0xf800)|(((g)<<3) & 0x07e0)|((b)>>3))
 
 static int drew_alt_bg = 0;
+#ifdef USE_SDL2
+static int menu_sdl2_initialized;
+#endif
 
 static char cores_path[MAX_PATH];
 static struct dirent **corelist = NULL;
@@ -111,6 +118,11 @@ static unsigned short fname2color(const char *fname)
 	return 0xFFFF;
 }
 
+const char *menu_translate(unsigned short text_id)
+{
+	return ui_text((enum ui_text_id)text_id);
+}
+
 #include "libpicofe/menu.c"
 
 static void draw_menu_message(const char *msg, void (*draw_more)(void))  __attribute__((unused));
@@ -123,16 +135,16 @@ static const char *mgn_saveloadcfg(int id, int *offs)
 static int mh_restore_defaults(int id, int keys)
 {
 	set_defaults();
-	menu_update_msg("defaults restored");
+	menu_update_msg(ui_text(UI_TEXT_DEFAULTS_RESTORED));
 	return 1;
 }
 
 static int mh_savecfg(int id, int keys)
 {
 	if (save_config(id == MA_OPT_SAVECFG_GAME ? CONFIG_TYPE_GAME : CONFIG_TYPE_CORE) == 0)
-		menu_update_msg("config saved");
+		menu_update_msg(ui_text(UI_TEXT_CONFIG_SAVED));
 	else
-		menu_update_msg("failed to write config");
+		menu_update_msg(ui_text(UI_TEXT_CONFIG_WRITE_FAILED));
 
 	return 1;
 }
@@ -800,17 +812,17 @@ static const char *men_scale_filter[] =
 
 static menu_entry e_menu_video_options[] =
 {
-	mee_onoff_h      ("Show FPS",                 0, show_fps, 1, h_show_fps),
-	mee_onoff_h      ("Show CPU usage",           0, show_cpu, 1, h_show_cpu),
-	mee_enum_h       ("Display mode",             0, scale_size, men_scale_size, h_scale_size),
+	mee_onoff_h_t    (UI_TEXT_SHOW_FPS,             0, show_fps, 1, h_show_fps),
+	mee_onoff_h_t    (UI_TEXT_SHOW_CPU_USAGE,       0, show_cpu, 1, h_show_cpu),
+	mee_enum_h_t     (UI_TEXT_DISPLAY_MODE,         0, scale_size, men_scale_size, h_scale_size),
 #ifdef FUNKEY_S
-	mee_cust_h       ("Zoom level",                  MB_OPT_CUSTOM, mh_zoom_level, mgn_zoom_level, h_zoom_level),
-	mee_enum_h       ("Screen panning",           0, pan_display, men_pan_display, h_pan_display),
-	mee_enum_h       ("Screen rotation",          0, rotate_display, men_rotate_display, h_rotate_display),
+	mee_cust_h_t     (UI_TEXT_ZOOM_LEVEL,            MB_OPT_CUSTOM, mh_zoom_level, mgn_zoom_level, h_zoom_level),
+	mee_enum_h_t     (UI_TEXT_SCREEN_PANNING,        0, pan_display, men_pan_display, h_pan_display),
+	mee_enum_h_t     (UI_TEXT_SCREEN_ROTATION,       0, rotate_display, men_rotate_display, h_rotate_display),
 #endif
-	mee_enum_h       ("Scaling filter",           0, scale_filter, men_scale_filter, h_scale_filter),
-	mee_range_h      ("Audio buffer",             0, audio_buffer_size, 1, 15, h_audio_buffer_size),
-	mee_onoff_h      ("Audio adjustment",         0, enable_drc, 1, h_enable_drc),
+	mee_enum_h_t     (UI_TEXT_SCALING_FILTER,        0, scale_filter, men_scale_filter, h_scale_filter),
+	mee_range_h_t    (UI_TEXT_AUDIO_BUFFER,          0, audio_buffer_size, 1, 15, h_audio_buffer_size),
+	mee_onoff_h_t    (UI_TEXT_AUDIO_ADJUSTMENT,      0, enable_drc, 1, h_enable_drc),
 	mee_end,
 };
 
@@ -851,12 +863,12 @@ const char *config_label(int id, int *offs) {
 
 static menu_entry e_menu_config_options[] =
 {
-	mee_onoff_h      ("Use .srm saves",           0, use_srm, 1, h_use_srm),
+	mee_onoff_h_t    (UI_TEXT_USE_SRM_SAVES,       0, use_srm, 1, h_use_srm),
 	mee_label        (""),
-	mee_cust_nosave  ("Save global config",       MA_OPT_SAVECFG,      mh_savecfg, mgn_saveloadcfg),
-	mee_cust_nosave  ("Save game config",         MA_OPT_SAVECFG_GAME, mh_savecfg, mgn_saveloadcfg),
-	mee_handler_id_h ("Delete game config",       MA_OPT_RMCFG_GAME,   mh_rmcfg,   h_rm_config_game),
-	mee_handler_h    ("Restore defaults",         mh_restore_defaults, h_restore_def),
+	mee_cust_nosave_t(UI_TEXT_SAVE_GLOBAL_CONFIG, MA_OPT_SAVECFG,      mh_savecfg, mgn_saveloadcfg),
+	mee_cust_nosave_t(UI_TEXT_SAVE_GAME_CONFIG,   MA_OPT_SAVECFG_GAME, mh_savecfg, mgn_saveloadcfg),
+	mee_handler_id_h_t(UI_TEXT_DELETE_GAME_CONFIG, MA_OPT_RMCFG_GAME,  mh_rmcfg,   h_rm_config_game),
+	mee_handler_h_t  (UI_TEXT_RESTORE_DEFAULTS,    mh_restore_defaults, h_restore_def),
 	mee_label        (""),
 	mee_label_mk     (0,                          config_label),
 	mee_end,
@@ -874,11 +886,11 @@ static int menu_loop_config_options(int id, int keys)
 
 static menu_entry e_menu_options[] =
 {
-	mee_handler   ("Audio and video",    menu_loop_video_options),
-	mee_handler_id("Emulator options",   MA_OPT_CORE_OPTS,    menu_loop_core_options),
-	mee_handler_id("Player controls",    MA_CTRL_PLAYER1,     key_config_loop_wrap),
-	mee_handler_id("Emulator hotkeys",   MA_CTRL_EMU,         key_config_loop_wrap),
-	mee_handler   ("Save config",        menu_loop_config_options),
+	mee_handler_t   (UI_TEXT_AUDIO_VIDEO,       menu_loop_video_options),
+	mee_handler_id_t(UI_TEXT_EMULATOR_OPTIONS,  MA_OPT_CORE_OPTS, menu_loop_core_options),
+	mee_handler_id_t(UI_TEXT_PLAYER_CONTROLS,   MA_CTRL_PLAYER1,  key_config_loop_wrap),
+	mee_handler_id_t(UI_TEXT_EMULATOR_HOTKEYS,  MA_CTRL_EMU,      key_config_loop_wrap),
+	mee_handler_t   (UI_TEXT_SAVE_CONFIG,       menu_loop_config_options),
 	mee_end,
 };
 
@@ -920,16 +932,16 @@ static int main_menu_handler(int id, int keys)
 
 static menu_entry e_menu_main[] =
 {
-	mee_handler_id("Resume game",        MA_MAIN_RESUME_GAME, main_menu_handler),
-	mee_handler_id("Save state",         MA_MAIN_SAVE_STATE,  main_menu_handler),
-	mee_handler_id("Load state",         MA_MAIN_LOAD_STATE,  main_menu_handler),
-	mee_handler_id("Disc control",       MA_MAIN_DISC_CTRL,   menu_loop_disc),
-	mee_handler_id("Cheats",             MA_MAIN_CHEATS,      menu_loop_cheats),
-	mee_handler   ("Options",                                 menu_loop_options),
-	mee_handler_id("Reset game",         MA_MAIN_RESET_GAME,  main_menu_handler),
-	mee_handler_id("Load new game",      MA_MAIN_CONTENT_SEL, menu_loop_select_content),
-	mee_handler_id("About",              MA_MAIN_CREDITS,     main_menu_handler),
-	mee_handler_id("Exit",               MA_MAIN_EXIT,        main_menu_handler),
+	mee_handler_id_t(UI_TEXT_RESUME_GAME,   MA_MAIN_RESUME_GAME, main_menu_handler),
+	mee_handler_id_t(UI_TEXT_SAVE_STATE,    MA_MAIN_SAVE_STATE,  main_menu_handler),
+	mee_handler_id_t(UI_TEXT_LOAD_STATE,    MA_MAIN_LOAD_STATE,  main_menu_handler),
+	mee_handler_id_t(UI_TEXT_DISC_CONTROL,  MA_MAIN_DISC_CTRL,   menu_loop_disc),
+	mee_handler_id_t(UI_TEXT_CHEATS,        MA_MAIN_CHEATS,      menu_loop_cheats),
+	mee_handler_t   (UI_TEXT_OPTIONS,                            menu_loop_options),
+	mee_handler_id_t(UI_TEXT_RESET_GAME,    MA_MAIN_RESET_GAME,  main_menu_handler),
+	mee_handler_id_t(UI_TEXT_LOAD_NEW_GAME, MA_MAIN_CONTENT_SEL, menu_loop_select_content),
+	mee_handler_id_t(UI_TEXT_ABOUT,         MA_MAIN_CREDITS,     main_menu_handler),
+	mee_handler_id_t(UI_TEXT_EXIT,          MA_MAIN_EXIT,        main_menu_handler),
 	mee_end,
 };
 
@@ -961,6 +973,12 @@ finish:
 
 void menu_begin(void)
 {
+#ifdef USE_SDL2
+	if (menu_sdl2_initialized) {
+		menu_sdl2_copy_background(g_menubg_ptr, g_menuscreen_w);
+		drew_alt_bg = 1;
+	}
+#endif
 	if (!drew_alt_bg)
 		draw_src_bg();
 }
@@ -1009,6 +1027,26 @@ void menu_loop(void)
 
 int menu_init(void)
 {
+#ifdef USE_SDL2
+	char font_path[MAX_PATH];
+	char background_path[MAX_PATH];
+	int pos = plat_get_skin_dir(font_path, sizeof(font_path));
+
+	if (pos >= 0 &&
+	    pos + (int)sizeof("picoarch-ui.ttf") <= (int)sizeof(font_path) &&
+	    pos + (int)sizeof("background.png") <= (int)sizeof(background_path)) {
+		memcpy(background_path, font_path, (size_t)pos);
+		memcpy(font_path + pos, "picoarch-ui.ttf",
+		       sizeof("picoarch-ui.ttf"));
+		memcpy(background_path + pos, "background.png",
+		       sizeof("background.png"));
+		if (menu_sdl2_init(font_path, background_path,
+				   g_menuscreen_w, g_menuscreen_h) == 0)
+			menu_sdl2_initialized = 1;
+	}
+	if (!menu_sdl2_available() && ui_language_current() != UI_LANG_EN)
+		ui_language_set(UI_LANG_EN);
+#endif
 	menu_init_base();
 
 	g_menubg_src_ptr = calloc(g_menubg_src_pp * g_menubg_src_h, sizeof(uint16_t));
@@ -1022,6 +1060,10 @@ int menu_init(void)
 
 void menu_finish(void)
 {
+#ifdef USE_SDL2
+	menu_sdl2_finish();
+	menu_sdl2_initialized = 0;
+#endif
 	if (g_menubg_src_ptr) {
 		free(g_menubg_src_ptr);
 		g_menubg_src_ptr = NULL;
