@@ -163,3 +163,30 @@ size_t menu_utf8_truncate_cells(const char *src, size_t max_cells,
 	dst[written] = '\0';
 	return cells;
 }
+
+size_t menu_utf8_fit_width(const char *src, int max_width,
+			   char *dst, size_t dst_size,
+			   menu_utf8_width_fn width, void *opaque)
+{
+	size_t cells;
+	char *newline;
+
+	if (dst_size == 0)
+		return 0;
+	cells = menu_utf8_truncate_cells(src, (size_t)-1, dst, dst_size);
+	newline = strchr(dst, '\n');
+	if (newline != NULL) {
+		*newline = '\0';
+		cells = menu_utf8_cells(dst);
+	}
+	if (max_width < 0)
+		max_width = 0;
+	if (width == NULL)
+		return cells;
+
+	while (cells > 0 && width(dst, opaque) > max_width) {
+		cells = menu_utf8_truncate_cells(src, cells - 1,
+						dst, dst_size);
+	}
+	return cells;
+}

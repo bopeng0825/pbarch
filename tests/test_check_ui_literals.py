@@ -19,6 +19,20 @@ class LiteralScannerTests(unittest.TestCase):
             [(1, "About to delete")],
         )
 
+    def test_backslash_lf_splicing_precedes_literal_joining(self):
+        source = 'const char *s = "About to "\\\n"delete";\n'
+        self.assertEqual(
+            check_ui_literals.find_prohibited_literals(source),
+            [(1, "About to delete")],
+        )
+
+    def test_backslash_crlf_splicing_precedes_literal_joining(self):
+        source = 'const char *s = "About to "\\\r\n"delete";\r\n'
+        self.assertEqual(
+            check_ui_literals.find_prohibited_literals(source),
+            [(1, "About to delete")],
+        )
+
     def test_translation_inactive_legacy_literal_is_allowed(self):
         source = """
 #ifdef MENU_TRANSLATION_IDS

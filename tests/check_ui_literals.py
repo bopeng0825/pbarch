@@ -125,6 +125,7 @@ def _read_string(source: str, position: int):
 
 
 def find_prohibited_literals(source: str):
+    source = re.sub(r"\\\r?\n", "", source)
     source = _translation_active_source(source)
     failures = []
     position = 0

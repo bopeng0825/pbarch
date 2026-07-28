@@ -4,6 +4,19 @@
 
 #include "menu_layout.h"
 
+static int bitmap_text_width(const char *text, void *opaque)
+{
+	int glyph_width = *(int *)opaque;
+
+	return (int)strlen(text) * glyph_width;
+}
+
+static int cjk_pixel_width(const char *text, void *opaque)
+{
+	(void)opaque;
+	return strcmp(text, "中") == 0 ? 15 : (int)strlen(text) * 5;
+}
+
 static void test_font_sizes(void)
 {
 	assert(menu_main_font_px(240) == 12);
@@ -87,6 +100,31 @@ static void test_valid_replacement_codepoint(void)
 	assert(strcmp(out, "\xef\xbf\xbd" "A") == 0);
 }
 
+static void test_width_fitting_uses_bitmap_byte_width(void)
+{
+	char out[32];
+	int glyph_width = 8;
+
+	assert(menu_utf8_fit_width("中", 2 * glyph_width, out, sizeof(out),
+				   bitmap_text_width, &glyph_width) == 0);
+	assert(strcmp(out, "") == 0);
+	assert(menu_utf8_fit_width("A中B", 2 * glyph_width, out, sizeof(out),
+				   bitmap_text_width, &glyph_width) == 1);
+	assert(strcmp(out, "A") == 0);
+	assert(menu_utf8_fit_width("A中.txt", 6 * glyph_width, out, sizeof(out),
+				   bitmap_text_width, &glyph_width) == 5);
+	assert(strcmp(out, "A中.t") == 0);
+}
+
+static void test_width_fitting_uses_supplied_pixel_measurement(void)
+{
+	char out[8];
+
+	assert(menu_utf8_fit_width("中", 15, out, sizeof(out),
+				   cjk_pixel_width, NULL) == 2);
+	assert(strcmp(out, "中") == 0);
+}
+
 int main(void)
 {
 	test_font_sizes();
@@ -95,5 +133,7 @@ int main(void)
 	test_utf8_truncation_small_destinations();
 	test_malformed_utf8_truncation();
 	test_valid_replacement_codepoint();
+	test_width_fitting_uses_bitmap_byte_width();
+	test_width_fitting_uses_supplied_pixel_measurement();
 	return 0;
 }
