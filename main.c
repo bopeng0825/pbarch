@@ -18,6 +18,11 @@
 #include "ui_language.h"
 #include "util.h"
 
+#ifdef USE_SDL2
+#include <SDL2/SDL_ttf.h>
+static int sdl_ttf_initialized;
+#endif
+
 #ifdef MMENU
 #include <dlfcn.h>
 #include <mmenu.h>
@@ -774,6 +779,13 @@ int main(int argc, char **argv) {
 		quit(-1);
 	}
 
+#ifdef USE_SDL2
+	if (TTF_Init() == 0)
+		sdl_ttf_initialized = 1;
+	else
+		PA_ERROR("Error initializing SDL_ttf: %s\n", TTF_GetError());
+#endif
+
 	if (menu_init()) {
 		quit(-1);
 	}
@@ -902,6 +914,12 @@ void finish(void) {
 #endif
 
 	menu_finish();
+#ifdef USE_SDL2
+	if (sdl_ttf_initialized) {
+		TTF_Quit();
+		sdl_ttf_initialized = 0;
+	}
+#endif
 	core_close();
 	plat_finish();
 }
