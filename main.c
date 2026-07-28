@@ -14,6 +14,8 @@
 #include "overrides.h"
 #include "plat.h"
 #include "profile.h"
+#include "ui_config.h"
+#include "ui_language.h"
 #include "util.h"
 
 #ifdef MMENU
@@ -746,17 +748,27 @@ int state_resume(void) {
 
 int main(int argc, char **argv) {
 	char content_path[MAX_PATH];
+	char config_language[16] = "en";
+	const char *effective_language;
 	const struct core_override *override;
+	struct app_args args;
 	int defer_frames = 0;
 
 	install_signal_handlers();
 
-	if (argc > 1) {
-		if (!strcmp(argv[1], "-h") || !strcmp(argv[1], "--help")) {
-			printf("Usage: picoarch [libretro_core [content]]\n");
-			return 0;
-		}
+	if (app_args_parse(argc, argv, &args) != 0) {
+		printf("Usage: picoarch [--language CODE] [libretro_core [content]]\n");
+		return 1;
 	}
+	if (args.show_help) {
+		printf("Usage: picoarch [--language CODE] [libretro_core [content]]\n");
+		return 0;
+	}
+
+	ui_config_load(config_language, sizeof(config_language));
+	effective_language = args.language_override != NULL ?
+			     args.language_override : config_language;
+	ui_language_set(ui_language_parse(effective_language));
 
 	if (plat_init()) {
 		quit(-1);
@@ -766,9 +778,9 @@ int main(int argc, char **argv) {
 		quit(-1);
 	}
 
-	if (argc > 1 && argv[1]) {
-		if (!realpath(argv[1], core_path)) {
-			strncpy(core_path, argv[1], sizeof(core_path) - 1);
+	if (args.core_path != NULL) {
+		if (!realpath(args.core_path, core_path)) {
+			strncpy(core_path, args.core_path, sizeof(core_path) - 1);
 		}
 	} else {
 		if (menu_select_core())
@@ -781,8 +793,8 @@ int main(int argc, char **argv) {
 		quit(-1);
 	}
 
-	if (argc > 2 && argv[2]) {
-		strncpy(content_path, argv[2], sizeof(content_path) - 1);
+	if (args.content_path != NULL) {
+		strncpy(content_path, args.content_path, sizeof(content_path) - 1);
 	} else {
 		if (menu_select_content(content_path, sizeof(content_path)))
 			quit(-1);
