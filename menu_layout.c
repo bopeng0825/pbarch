@@ -4,20 +4,30 @@
 
 #define REPLACEMENT_CODEPOINT 0xfffd
 
-static size_t decode_utf8(const unsigned char *text, unsigned int *codepoint)
+struct utf8_decoded {
+	unsigned int codepoint;
+	size_t bytes;
+	int valid;
+};
+
+static struct utf8_decoded decode_utf8(const unsigned char *text)
 {
+	struct utf8_decoded decoded = { REPLACEMENT_CODEPOINT, 1, 0 };
 	unsigned int value;
 
 	if (text[0] < 0x80) {
-		*codepoint = text[0];
-		return 1;
+		decoded.codepoint = text[0];
+		decoded.valid = 1;
+		return decoded;
 	}
 
 	if (text[0] >= 0xc2 && text[0] <= 0xdf &&
 	    text[1] >= 0x80 && text[1] <= 0xbf) {
-		*codepoint = ((unsigned int)(text[0] & 0x1f) << 6) |
+		decoded.codepoint = ((unsigned int)(text[0] & 0x1f) << 6) |
 			(text[1] & 0x3f);
-		return 2;
+		decoded.bytes = 2;
+		decoded.valid = 1;
+		return decoded;
 	}
 
 	if (text[0] >= 0xe0 && text[0] <= 0xef && text[1] != '\0' &&
@@ -28,8 +38,10 @@ static size_t decode_utf8(const unsigned char *text, unsigned int *codepoint)
 		value = ((unsigned int)(text[0] & 0x0f) << 12) |
 			((unsigned int)(text[1] & 0x3f) << 6) |
 			(text[2] & 0x3f);
-		*codepoint = value;
-		return 3;
+		decoded.codepoint = value;
+		decoded.bytes = 3;
+		decoded.valid = 1;
+		return decoded;
 	}
 
 	if (text[0] >= 0xf0 && text[0] <= 0xf4 && text[1] != '\0' &&
@@ -43,24 +55,30 @@ static size_t decode_utf8(const unsigned char *text, unsigned int *codepoint)
 			((unsigned int)(text[1] & 0x3f) << 12) |
 			((unsigned int)(text[2] & 0x3f) << 6) |
 			(text[3] & 0x3f);
-		*codepoint = value;
-		return 4;
+		decoded.codepoint = value;
+		decoded.bytes = 4;
+		decoded.valid = 1;
+		return decoded;
 	}
 
-	*codepoint = REPLACEMENT_CODEPOINT;
-	return 1;
+	return decoded;
 }
 
 static size_t codepoint_cells(unsigned int codepoint)
 {
 	if ((codepoint >= 0x3000 && codepoint <= 0x303f) ||
 	    (codepoint >= 0x3040 && codepoint <= 0x30ff) ||
+	    (codepoint >= 0x1100 && codepoint <= 0x11ff) ||
+	    (codepoint >= 0x3130 && codepoint <= 0x318f) ||
 	    (codepoint >= 0x31f0 && codepoint <= 0x31ff) ||
 	    (codepoint >= 0x3400 && codepoint <= 0x4dbf) ||
 	    (codepoint >= 0x4e00 && codepoint <= 0x9fff) ||
-	    (codepoint >= 0xac00 && codepoint <= 0xd7af) ||
+	    (codepoint >= 0xa960 && codepoint <= 0xa97f) ||
+	    (codepoint >= 0xac00 && codepoint <= 0xd7a3) ||
+	    (codepoint >= 0xd7b0 && codepoint <= 0xd7ff) ||
 	    (codepoint >= 0xf900 && codepoint <= 0xfaff) ||
-	    (codepoint >= 0xff00 && codepoint <= 0xffef) ||
+	    (codepoint >= 0xff01 && codepoint <= 0xff60) ||
+	    (codepoint >= 0xffe0 && codepoint <= 0xffe6) ||
 	    (codepoint >= 0x20000 && codepoint <= 0x2ffff) ||
 	    (codepoint >= 0x30000 && codepoint <= 0x323af))
 		return 2;
@@ -93,10 +111,10 @@ size_t menu_utf8_cells(const char *text)
 		return 0;
 
 	while (*cursor != '\0') {
-		unsigned int codepoint;
+		struct utf8_decoded decoded = decode_utf8(cursor);
 
-		cursor += decode_utf8(cursor, &codepoint);
-		cells += codepoint_cells(codepoint);
+		cursor += decoded.bytes;
+		cells += codepoint_cells(decoded.codepoint);
 	}
 	return cells;
 }
@@ -118,13 +136,13 @@ size_t menu_utf8_truncate_cells(const char *src, size_t max_cells,
 
 	while (*cursor != '\0') {
 		const unsigned char *bytes = cursor;
-		unsigned int codepoint;
-		size_t byte_count = decode_utf8(cursor, &codepoint);
-		size_t cell_count = codepoint_cells(codepoint);
+		struct utf8_decoded decoded = decode_utf8(cursor);
+		size_t byte_count = decoded.bytes;
+		size_t cell_count = codepoint_cells(decoded.codepoint);
 
 		if (cells + cell_count > max_cells)
 			break;
-		if (codepoint == REPLACEMENT_CODEPOINT) {
+		if (!decoded.valid) {
 			bytes = replacement;
 			byte_count = sizeof(replacement);
 		}
@@ -134,7 +152,7 @@ size_t menu_utf8_truncate_cells(const char *src, size_t max_cells,
 		memcpy(dst + written, bytes, byte_count);
 		written += byte_count;
 		cells += cell_count;
-		cursor += codepoint == REPLACEMENT_CODEPOINT ? 1 : byte_count;
+		cursor += decoded.bytes;
 	}
 	dst[written] = '\0';
 	return cells;

@@ -17,6 +17,13 @@ static void test_utf8_cell_widths(void)
 	assert(menu_utf8_cells("ABC") == 3);
 	assert(menu_utf8_cells("选项") == 4);
 	assert(menu_utf8_cells("A选B") == 4);
+	assert(menu_utf8_cells("\xe1\x84\x80") == 2);
+	assert(menu_utf8_cells("\xe3\x84\xb1") == 2);
+	assert(menu_utf8_cells("\xef\xbc\x81") == 2);
+	assert(menu_utf8_cells("\xef\xbd\xa0") == 2);
+	assert(menu_utf8_cells("\xef\xbf\xa0") == 2);
+	assert(menu_utf8_cells("\xef\xbf\xa6") == 2);
+	assert(menu_utf8_cells("\xef\xbf\xa8") == 1);
 	assert(menu_utf8_cells("\xff") == 1);
 	assert(menu_utf8_cells("\xe9") == 1);
 	assert(menu_utf8_cells("\xe9\x80") == 2);
@@ -68,6 +75,16 @@ static void test_malformed_utf8_truncation(void)
 	assert(out[4] == '\0');
 }
 
+static void test_valid_replacement_codepoint(void)
+{
+	char out[8];
+
+	assert(menu_utf8_cells("\xef\xbf\xbd" "A") == 2);
+	assert(menu_utf8_truncate_cells("\xef\xbf\xbd" "A", 2, out,
+					sizeof(out)) == 2);
+	assert(strcmp(out, "\xef\xbf\xbd" "A") == 0);
+}
+
 int main(void)
 {
 	test_font_sizes();
@@ -75,5 +92,6 @@ int main(void)
 	test_utf8_truncation();
 	test_utf8_truncation_small_destinations();
 	test_malformed_utf8_truncation();
+	test_valid_replacement_codepoint();
 	return 0;
 }
