@@ -74,6 +74,36 @@ class LegacyMenuGeometryTest(unittest.TestCase):
 		self.assertIn("me_sfont_w = MENU_X2 ? 12 : 6;", body)
 		self.assertIn("me_sfont_h = MENU_X2 ? 20 : 10;", body)
 
+	def test_legacy_message_width_counts_full_lines_beyond_255_bytes(self):
+		body = re.search(
+			r"static void draw_menu_message\(.*?\)\s*\{(?P<body>.*?)"
+			r"\n\}\n\n// -------------- del confirm",
+			MENU_SOURCE,
+			re.DOTALL,
+		)
+		self.assertIsNotNone(body)
+		self.assertRegex(
+			body.group("body"),
+			re.compile(
+				r"#ifdef USE_SDL2.*?"
+				r"if \(length >= sizeof\(line\)\).*?"
+				r"wt = menu_text_width\(line, 0\);.*?"
+				r"#else\s+"
+				r"for \(wt = 0; \*p != 0 && \*p != '\\n'; p\+\+\)\s+"
+				r"wt\+\+;\s+"
+				r"#endif.*?"
+				r"#ifdef USE_SDL2\s+"
+				r"x = g_menuscreen_w / 2 - w / 2;\s+"
+				r"#else\s+"
+				r"x = g_menuscreen_w / 2 - w \* me_mfont_w / 2;\s+"
+				r"#endif",
+				re.DOTALL,
+			),
+		)
+		long_line = "x" * 300
+		self.assertEqual(len(long_line) * 8, 2400)
+		self.assertGreater(len(long_line), 255)
+
 
 if __name__ == "__main__":
 	unittest.main()
