@@ -22,7 +22,7 @@ def read_catalog():
 	if not rows or rows[0] != HEADER:
 		raise ValueError("catalog header must be: key, en, zh_CN, zh_TW")
 
-	seen = set()
+	seen = {FALLBACK_ROW[0]}
 	catalog = []
 	for line_number, row in enumerate(rows[1:], start=2):
 		if len(row) != 4:
