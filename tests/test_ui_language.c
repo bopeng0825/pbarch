@@ -4,6 +4,19 @@
 
 int main(void)
 {
+	enum ui_language language;
+
+	assert(ui_language_parse_checked("en", &language));
+	assert(language == UI_LANG_EN);
+	assert(ui_language_parse_checked("zh-CN", &language));
+	assert(language == UI_LANG_ZH_CN);
+	assert(!ui_language_parse_checked("", &language));
+	assert(language == UI_LANG_EN);
+	assert(!ui_language_parse_checked("fr", &language));
+	assert(language == UI_LANG_EN);
+	assert(!ui_language_parse_checked(NULL, &language));
+	assert(language == UI_LANG_EN);
+
 	assert(ui_language_parse(NULL) == UI_LANG_EN);
 	assert(ui_language_parse("en") == UI_LANG_EN);
 	assert(ui_language_parse("zh_CN") == UI_LANG_ZH_CN);

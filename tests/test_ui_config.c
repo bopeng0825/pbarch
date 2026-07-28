@@ -17,6 +17,7 @@ int plat_get_root_dir(char *dst, int len)
 int main(void)
 {
 	struct app_args args;
+	enum ui_language selected;
 	char language[16];
 	char *argv1[] = {
 		"picoarch", "--language", "zh_TW", "core.so", "game.rom"
@@ -42,6 +43,7 @@ int main(void)
 			       sizeof(language)) == -1);
 	assert(ui_config_parse("unknown=value\n", language,
 			       sizeof(language)) == -1);
+	assert(ui_config_parse("", language, sizeof(language)) == -1);
 	assert(ui_config_parse("language=en\nlanguage=zh_CN\n", language,
 			       sizeof(language)) == -1);
 	assert(ui_config_parse("language=0123456789abcdef\n", language,
@@ -52,9 +54,42 @@ int main(void)
 	assert(config_file != NULL);
 	assert(fputs("language = zh_TW\n", config_file) >= 0);
 	assert(fclose(config_file) == 0);
-	assert(ui_config_load(language, sizeof(language)) == 0);
+	assert(ui_config_load(language, sizeof(language)) == UI_CONFIG_LOADED);
 	assert(strcmp(language, "zh_TW") == 0);
 	assert(remove("tests/ui.cfg") == 0);
+	assert(ui_config_load(language, sizeof(language)) == UI_CONFIG_ABSENT);
+
+	config_file = fopen("tests/ui.cfg", "wb");
+	assert(config_file != NULL);
+	assert(fputs("language bad\n", config_file) >= 0);
+	assert(fclose(config_file) == 0);
+	assert(ui_config_load(language, sizeof(language)) == UI_CONFIG_INVALID);
+	assert(remove("tests/ui.cfg") == 0);
+
+	assert(ui_language_resolve(UI_CONFIG_ABSENT, "ignored", NULL, 1,
+				   &selected) == UI_LANGUAGE_CHOICE_OK);
+	assert(selected == UI_LANG_EN);
+	assert(ui_language_resolve(UI_CONFIG_INVALID, "ignored", NULL, 1,
+				   &selected) == UI_LANGUAGE_CHOICE_WARN_CONFIG);
+	assert(selected == UI_LANG_EN);
+	assert(ui_language_resolve(UI_CONFIG_INVALID, "ignored", "zh-CN", 1,
+				   &selected) == UI_LANGUAGE_CHOICE_OK);
+	assert(selected == UI_LANG_ZH_CN);
+	assert(ui_language_resolve(UI_CONFIG_LOADED, "", NULL, 1,
+				   &selected) == UI_LANGUAGE_CHOICE_WARN_LANGUAGE);
+	assert(selected == UI_LANG_EN);
+	assert(ui_language_resolve(UI_CONFIG_LOADED, "fr", NULL, 1,
+				   &selected) == UI_LANGUAGE_CHOICE_WARN_LANGUAGE);
+	assert(selected == UI_LANG_EN);
+	assert(ui_language_resolve(UI_CONFIG_LOADED, "zh-TW", "bad", 1,
+				   &selected) == UI_LANGUAGE_CHOICE_WARN_LANGUAGE);
+	assert(selected == UI_LANG_EN);
+	assert(ui_language_resolve(UI_CONFIG_LOADED, "bad", "zh_TW", 1,
+				   &selected) == UI_LANGUAGE_CHOICE_OK);
+	assert(selected == UI_LANG_ZH_TW);
+	assert(ui_language_resolve(UI_CONFIG_LOADED, "zh_CN", NULL, 0,
+				   &selected) == UI_LANGUAGE_CHOICE_OK);
+	assert(selected == UI_LANG_EN);
 
 	assert(app_args_parse(5, argv1, &args) == 0);
 	assert(strcmp(args.language_override, "zh_TW") == 0);

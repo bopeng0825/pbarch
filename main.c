@@ -754,7 +754,9 @@ int state_resume(void) {
 int main(int argc, char **argv) {
 	char content_path[MAX_PATH];
 	char config_language[16] = "en";
-	const char *effective_language;
+	enum ui_config_load_status config_status;
+	enum ui_language_choice_status language_status;
+	enum ui_language language;
 	const struct core_override *override;
 	struct app_args args;
 	int defer_frames = 0;
@@ -770,10 +772,20 @@ int main(int argc, char **argv) {
 		return 0;
 	}
 
-	ui_config_load(config_language, sizeof(config_language));
-	effective_language = args.language_override != NULL ?
-			     args.language_override : config_language;
-	ui_language_set(ui_language_parse(effective_language));
+	config_status = ui_config_load(config_language, sizeof(config_language));
+	language_status = ui_language_resolve(
+		config_status, config_language, args.language_override,
+#ifdef USE_SDL2
+		1,
+#else
+		0,
+#endif
+		&language);
+	if (language_status == UI_LANGUAGE_CHOICE_WARN_CONFIG)
+		PA_WARN("Invalid ui.cfg; using English\n");
+	else if (language_status == UI_LANGUAGE_CHOICE_WARN_LANGUAGE)
+		PA_WARN("Unsupported menu language; using English\n");
+	ui_language_set(language);
 
 	if (plat_init()) {
 		quit(-1);

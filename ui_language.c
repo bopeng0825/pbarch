@@ -5,15 +5,32 @@
 
 static enum ui_language current_language = UI_LANG_EN;
 
+int ui_language_parse_checked(const char *code, enum ui_language *language)
+{
+	if (language == NULL)
+		return 0;
+	*language = UI_LANG_EN;
+	if (code == NULL)
+		return 0;
+	if (strcmp(code, "en") == 0)
+		return 1;
+	if (strcmp(code, "zh_CN") == 0 || strcmp(code, "zh-CN") == 0) {
+		*language = UI_LANG_ZH_CN;
+		return 1;
+	}
+	if (strcmp(code, "zh_TW") == 0 || strcmp(code, "zh-TW") == 0) {
+		*language = UI_LANG_ZH_TW;
+		return 1;
+	}
+	return 0;
+}
+
 enum ui_language ui_language_parse(const char *code)
 {
-	if (code == NULL)
-		return UI_LANG_EN;
-	if (strcmp(code, "zh_CN") == 0 || strcmp(code, "zh-CN") == 0)
-		return UI_LANG_ZH_CN;
-	if (strcmp(code, "zh_TW") == 0 || strcmp(code, "zh-TW") == 0)
-		return UI_LANG_ZH_TW;
-	return UI_LANG_EN;
+	enum ui_language language;
+
+	ui_language_parse_checked(code, &language);
+	return language;
 }
 
 void ui_language_set(enum ui_language language)

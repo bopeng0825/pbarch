@@ -1,4 +1,5 @@
 #include <ctype.h>
+#include <errno.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -61,14 +62,15 @@ int ui_config_parse(const char *text, char *language, size_t language_size)
 		text = *line_end == '\0' ? line_end : line_end + 1;
 	}
 
-	if (selected != NULL) {
-		memcpy(language, selected, selected_len);
-		language[selected_len] = '\0';
-	}
+	if (selected == NULL)
+		return -1;
+	memcpy(language, selected, selected_len);
+	language[selected_len] = '\0';
 	return 0;
 }
 
-int ui_config_load(char *language, size_t language_size)
+enum ui_config_load_status ui_config_load(char *language,
+					  size_t language_size)
 {
 	char path[4096];
 	char text[4096];
@@ -78,30 +80,59 @@ int ui_config_load(char *language, size_t language_size)
 	int written;
 
 	if (language == NULL || language_size == 0)
-		return -1;
+		return UI_CONFIG_INVALID;
 	if (plat_get_root_dir(path, (int)sizeof(path)) < 0)
-		return -1;
+		return UI_CONFIG_INVALID;
 	path[sizeof(path) - 1] = '\0';
 	root_len = strlen(path);
 	if (root_len >= sizeof(path))
-		return -1;
+		return UI_CONFIG_INVALID;
 	written = snprintf(path + root_len, sizeof(path) - root_len, "%s",
 			   "ui.cfg");
 	if (written < 0 || (size_t)written >= sizeof(path) - root_len)
-		return -1;
+		return UI_CONFIG_INVALID;
 
+	errno = 0;
 	file = fopen(path, "rb");
 	if (file == NULL)
-		return -1;
+		return errno == ENOENT ? UI_CONFIG_ABSENT : UI_CONFIG_INVALID;
 	bytes_read = fread(text, 1, sizeof(text) - 1, file);
 	if (ferror(file) || (!feof(file) && bytes_read == sizeof(text) - 1)) {
 		fclose(file);
-		return -1;
+		return UI_CONFIG_INVALID;
 	}
 	fclose(file);
 	text[bytes_read] = '\0';
 
-	return ui_config_parse(text, language, language_size);
+	return ui_config_parse(text, language, language_size) == 0 ?
+	       UI_CONFIG_LOADED : UI_CONFIG_INVALID;
+}
+
+enum ui_language_choice_status ui_language_resolve(
+	enum ui_config_load_status config_status, const char *config_language,
+	const char *language_override, int allow_non_english,
+	enum ui_language *language)
+{
+	const char *effective;
+
+	if (language == NULL)
+		return UI_LANGUAGE_CHOICE_WARN_LANGUAGE;
+	*language = UI_LANG_EN;
+
+	if (language_override != NULL)
+		effective = language_override;
+	else if (config_status == UI_CONFIG_LOADED)
+		effective = config_language;
+	else if (config_status == UI_CONFIG_INVALID)
+		return UI_LANGUAGE_CHOICE_WARN_CONFIG;
+	else
+		return UI_LANGUAGE_CHOICE_OK;
+
+	if (!ui_language_parse_checked(effective, language))
+		return UI_LANGUAGE_CHOICE_WARN_LANGUAGE;
+	if (!allow_non_english)
+		*language = UI_LANG_EN;
+	return UI_LANGUAGE_CHOICE_OK;
 }
 
 int app_args_parse(int argc, char **argv, struct app_args *out)

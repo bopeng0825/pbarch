@@ -59,6 +59,7 @@ enum ui_text_id {
 	UI_TEXT_COUNT
 };
 
+int ui_language_parse_checked(const char *code, enum ui_language *language);
 enum ui_language ui_language_parse(const char *code);
 void ui_language_set(enum ui_language language);
 enum ui_language ui_language_current(void);
