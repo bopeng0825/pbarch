@@ -194,6 +194,24 @@ def menu_message_uses_utf8_fitting(source: str) -> bool:
     ) is not None
 
 
+def sdl_unavailable_uses_bitmap_byte_width(source: str) -> bool:
+    function = re.search(
+        r"static\s+int\s+menu_text_width\s*\([^)]*\)\s*\{"
+        r"(?P<body>.*?)\n\}",
+        source,
+        re.DOTALL,
+    )
+    if function is None:
+        return False
+    return re.search(
+        r"if\s*\(\s*menu_sdl2_available\s*\(\s*\)\s*\).*?"
+        r"return\s+menu_sdl2_text_width\s*\(.*?;"
+        r"\s*return\s+menu_bitmap_text_width\s*\(",
+        function.group("body"),
+        re.DOTALL,
+    ) is not None
+
+
 def main() -> int:
     failures = []
     for path in SOURCES:
@@ -214,6 +232,10 @@ def main() -> int:
         return 1
     if not menu_message_uses_utf8_fitting(menu_source):
         print("menu.c: menu messages must use UTF-8-safe fitting", file=sys.stderr)
+        return 1
+    libpicofe_source = SOURCES[1].read_text(encoding="utf-8")
+    if not sdl_unavailable_uses_bitmap_byte_width(libpicofe_source):
+        print("libpicofe/menu.c: SDL fallback must use bitmap width", file=sys.stderr)
         return 1
     return 0
 

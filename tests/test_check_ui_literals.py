@@ -61,6 +61,9 @@ class IntegrationGuardTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.menu_source = (ROOT / "menu.c").read_text(encoding="utf-8")
+        cls.libpicofe_menu_source = (
+            ROOT / "libpicofe" / "menu.c"
+        ).read_text(encoding="utf-8")
 
     def test_non_sdl_build_forces_english(self):
         self.assertTrue(
@@ -77,6 +80,13 @@ class IntegrationGuardTests(unittest.TestCase):
     def test_menu_message_uses_utf8_fitting(self):
         self.assertTrue(
             check_ui_literals.menu_message_uses_utf8_fitting(self.menu_source)
+        )
+
+    def test_sdl_unavailable_uses_bitmap_byte_width(self):
+        self.assertTrue(
+            check_ui_literals.sdl_unavailable_uses_bitmap_byte_width(
+                self.libpicofe_menu_source
+            )
         )
 
 

@@ -8,7 +8,7 @@ static int bitmap_text_width(const char *text, void *opaque)
 {
 	int glyph_width = *(int *)opaque;
 
-	return (int)strlen(text) * glyph_width;
+	return menu_bitmap_text_width(text, glyph_width);
 }
 
 static int cjk_pixel_width(const char *text, void *opaque)

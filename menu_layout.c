@@ -1,5 +1,6 @@
 #include "menu_layout.h"
 
+#include <limits.h>
 #include <string.h>
 
 #define REPLACEMENT_CODEPOINT 0xfffd
@@ -189,4 +190,16 @@ size_t menu_utf8_fit_width(const char *src, int max_width,
 						dst, dst_size);
 	}
 	return cells;
+}
+
+int menu_bitmap_text_width(const char *text, int glyph_width)
+{
+	size_t bytes;
+
+	if (text == NULL || glyph_width <= 0)
+		return 0;
+	bytes = strlen(text);
+	if (bytes > (size_t)INT_MAX / (size_t)glyph_width)
+		return INT_MAX;
+	return (int)bytes * glyph_width;
 }
