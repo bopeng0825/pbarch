@@ -3,6 +3,7 @@
 
 import argparse
 import csv
+import hashlib
 import shutil
 import struct
 import subprocess
@@ -19,8 +20,14 @@ LICENSE = SKIN_DIR / "OFL.txt"
 BACKGROUND = SKIN_DIR / "background.png"
 GLYPH_LIST = ROOT / "build" / "ui-glyphs.txt"
 FAMILY_NAME = "Picoarch UI"
+FONTTOOLS_VERSION = "4.63.0"
+SOURCE_SHA256 = "9fe57a71eb48e50cccb77903123d08857edefcf289c7b309462c4c3d82208126"
 BACKGROUND_RGB = (24, 28, 24)
 PNG_SIZE = (8, 8)
+TRUETYPE_SFNT_VERSION = "\x00\x01\x00\x00"
+VARIABLE_OR_CFF_TABLES = {
+	"fvar", "gvar", "avar", "HVAR", "VVAR", "MVAR", "cvar", "CFF ", "CFF2"
+}
 
 
 def catalog_codepoints():
@@ -36,12 +43,17 @@ def catalog_codepoints():
 
 def load_fonttools():
 	try:
+		import fontTools
 		from fontTools.ttLib import TTFont
 		from fontTools.varLib.instancer import instantiateVariableFont
 	except ImportError as error:
 		raise RuntimeError(
 			"fonttools is required (install with: python3 -m pip install fonttools)"
 		) from error
+	if fontTools.__version__ != FONTTOOLS_VERSION:
+		raise RuntimeError(
+			f"fonttools {FONTTOOLS_VERSION} is required, got {fontTools.__version__}"
+		)
 	return TTFont, instantiateVariableFont
 
 
@@ -101,11 +113,20 @@ def check_assets():
 
 	TTFont, _ = load_fonttools()
 	with TTFont(FONT, lazy=True) as font:
+		if font.reader.sfntVersion != TRUETYPE_SFNT_VERSION:
+			raise RuntimeError("font must use TrueType outlines (sfnt version 0x00010000)")
+		if not {"glyf", "loca"}.issubset(font.keys()):
+			raise RuntimeError("font must contain TrueType glyf and loca tables")
+		disallowed_tables = sorted(VARIABLE_OR_CFF_TABLES.intersection(font.keys()))
+		if disallowed_tables:
+			raise RuntimeError(
+				"font must be static TrueType; found table(s): "
+				+ ", ".join(disallowed_tables)
+			)
 		codepoints = set()
 		for table in font["cmap"].tables:
 			codepoints.update(table.cmap)
-		required = {ord(character) for character in catalog_codepoints()
-					if not character.isspace()}
+		required = {ord(character) for character in catalog_codepoints()}
 		missing_codepoints = sorted(required - codepoints)
 		if missing_codepoints:
 			values = ", ".join(f"U+{codepoint:04X}" for codepoint in missing_codepoints)
@@ -174,6 +195,11 @@ def rename_font():
 def build_assets(source, license_path):
 	if not source.is_file():
 		raise RuntimeError(f"font source does not exist: {source}")
+	source_sha256 = hashlib.sha256(source.read_bytes()).hexdigest()
+	if source_sha256 != SOURCE_SHA256:
+		raise RuntimeError(
+			f"font source SHA-256 must be {SOURCE_SHA256}, got {source_sha256}"
+		)
 	if license_path is None:
 		license_path = source.with_name("LICENSE")
 	if not license_path.is_file():

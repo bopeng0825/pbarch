@@ -168,27 +168,27 @@ python3 tools/gen_ui_catalog.py
 ```
 
 The bundled `skin/picoarch-ui.ttf` is a UI-only Regular-weight subset of
-Noto Sans Mono CJK SC. Rebuild it with fonttools from an official source and
-the matching `Sans/LICENSE`:
+Noto Sans Mono CJK SC. Rebuild it with the pinned fonttools 4.63.0 and the
+matching `Sans/LICENSE`:
 
 ```
+python3 -m pip install fonttools==4.63.0
 python3 tools/subset_ui_font.py \
-  --source path/to/NotoSansMonoCJKsc-Regular.ttf \
+  --source path/to/NotoSansMonoCJKsc-VF.ttf \
   --license path/to/LICENSE
 python3 tools/subset_ui_font.py --check
 ```
 
-Variable sources such as `NotoSansMonoCJKsc-VF.ttf` are accepted; the script
-instantiates their Regular (`wght=400`) face before subsetting. It includes
-all catalog characters, printable ASCII, and U+00A0, renames the modified
-family to `Picoarch UI`, and regenerates the solid RGB `(24, 28, 24)`
-background.
+The script verifies the pinned source SHA-256, instantiates its Regular
+(`wght=400`) face, then subsets it. It includes all catalog characters,
+printable ASCII, and U+00A0, renames the modified family to `Picoarch UI`,
+and regenerates the solid RGB `(24, 28, 24)` background.
 
 The source used for the checked-in subset is the official notofonts
-Sans2.004 [NotoSansMonoCJKsc variable
-TTF](https://raw.githubusercontent.com/googlefonts/noto-cjk/main/Sans/Variable/TTF/Mono/NotoSansMonoCJKsc-VF.ttf),
+Sans2.004 [NotoSansMonoCJKsc variable TTF pinned at commit
+`165c01b46ea533872e002e0785ff17e44f6d97d8`](https://raw.githubusercontent.com/notofonts/noto-cjk/165c01b46ea533872e002e0785ff17e44f6d97d8/Sans/Variable/TTF/Mono/NotoSansMonoCJKsc-VF.ttf),
 SHA-256
-`703e3df45a06364fe9798265ddae63cd79d3ebd8adcbab738e1b1ac3354319b2`.
+`9fe57a71eb48e50cccb77903123d08857edefcf289c7b309462c4c3d82208126`.
 The unmodified `skin/OFL.txt` came from the matching official
 [`13_NotoSansMonoCJKsc.zip`](https://github.com/notofonts/noto-cjk/releases/download/Sans2.004/13_NotoSansMonoCJKsc.zip),
 archive SHA-256
