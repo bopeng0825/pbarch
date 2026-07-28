@@ -88,7 +88,13 @@ static size_t codepoint_cells(unsigned int codepoint)
 
 int menu_main_font_px(int menu_height)
 {
-	int pixels = (menu_height + 12) / 24;
+	int pixels;
+
+	if (menu_height <= 0)
+		return 12;
+	pixels = menu_height / 24;
+	if (menu_height % 24 >= 12)
+		pixels++;
 
 	if (pixels < 12)
 		pixels = 12;

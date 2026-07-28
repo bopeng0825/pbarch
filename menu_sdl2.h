@@ -19,6 +19,9 @@ int menu_sdl2_main_font_px(void);
 int menu_sdl2_small_font_px(void);
 int menu_sdl2_line_height(enum menu_font_role role);
 int menu_sdl2_text_width(enum menu_font_role role, const char *utf8);
+uint32_t menu_sdl2_scale_coordinate(uint32_t coordinate,
+				    uint32_t source_size,
+				    uint32_t destination_size);
 int menu_sdl2_draw_text(uint16_t *pixels, int pitch_pixels,
 			enum menu_font_role role, int x, int y,
 			uint16_t color, const char *utf8);

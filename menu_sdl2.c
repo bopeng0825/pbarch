@@ -12,6 +12,8 @@
 #include "menu_layout.h"
 #include "text_cache.h"
 
+#define MENU_MAX_DIMENSION 8192
+
 struct menu_sdl2_state {
 	int width;
 	int height;
@@ -35,6 +37,14 @@ static void release_surface(void *value)
 static int role_valid(enum menu_font_role role)
 {
 	return role == MENU_FONT_MAIN || role == MENU_FONT_SMALL;
+}
+
+static int framebuffer_span_valid(int pitch_pixels, int height)
+{
+	if (pitch_pixels <= 0 || height <= 0)
+		return 0;
+	return (size_t)pitch_pixels <=
+	       SIZE_MAX / sizeof(uint16_t) / (size_t)height;
 }
 
 static uint16_t rgb565(unsigned char red, unsigned char green,
@@ -92,10 +102,12 @@ static void load_background(const char *path)
 	}
 
 	for (y = 0; y < state.height; y++) {
-		size_t source_y = (size_t)y * image.height / state.height;
+		uint32_t source_y = menu_sdl2_scale_coordinate(
+			(uint32_t)y, image.height, (uint32_t)state.height);
 
 		for (x = 0; x < state.width; x++) {
-			size_t source_x = (size_t)x * image.width / state.width;
+			uint32_t source_x = menu_sdl2_scale_coordinate(
+				(uint32_t)x, image.width, (uint32_t)state.width);
 			size_t source = source_y * image_row + source_x * 3u;
 
 			state.background[(size_t)y * state.width + x] =
@@ -111,7 +123,8 @@ static void load_background(const char *path)
 static SDL_Surface *destination_surface(uint16_t *pixels, int pitch_pixels)
 {
 	if (pixels == NULL || pitch_pixels < state.width ||
-	    pitch_pixels > INT_MAX / (int)sizeof(*pixels))
+	    pitch_pixels > INT_MAX / (int)sizeof(*pixels) ||
+	    !framebuffer_span_valid(pitch_pixels, state.height))
 		return NULL;
 
 	if (state.destination != NULL &&
@@ -155,6 +168,7 @@ int menu_sdl2_init(const char *font_path, const char *background_path,
 
 	menu_sdl2_finish();
 	if (width <= 0 || height <= 0 ||
+	    width > MENU_MAX_DIMENSION || height > MENU_MAX_DIMENSION ||
 	    (size_t)width > SIZE_MAX / (size_t)height ||
 	    (size_t)width * (size_t)height > SIZE_MAX / sizeof(uint16_t)) {
 		fprintf(stderr, "menu: invalid SDL2 menu dimensions %dx%d\n",
@@ -241,6 +255,16 @@ int menu_sdl2_text_width(enum menu_font_role role, const char *utf8)
 	return width;
 }
 
+uint32_t menu_sdl2_scale_coordinate(uint32_t coordinate,
+				    uint32_t source_size,
+				    uint32_t destination_size)
+{
+	if (destination_size == 0)
+		return 0;
+	return (uint32_t)((uint64_t)coordinate * source_size /
+			  destination_size);
+}
+
 int menu_sdl2_draw_text(uint16_t *pixels, int pitch_pixels,
 			enum menu_font_role role, int x, int y,
 			uint16_t color, const char *utf8)
@@ -295,7 +319,7 @@ void menu_sdl2_copy_background(uint16_t *pixels, int pitch_pixels)
 
 	if (pixels == NULL || state.background == NULL ||
 	    pitch_pixels < state.width ||
-	    (size_t)pitch_pixels > SIZE_MAX / (size_t)state.height)
+	    !framebuffer_span_valid(pitch_pixels, state.height))
 		return;
 	for (y = 0; y < state.height; y++)
 		memcpy(pixels + (size_t)y * pitch_pixels,

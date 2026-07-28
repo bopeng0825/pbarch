@@ -1,4 +1,5 @@
 #include <assert.h>
+#include <limits.h>
 #include <string.h>
 
 #include "menu_layout.h"
@@ -9,6 +10,7 @@ static void test_font_sizes(void)
 	assert(menu_main_font_px(480) == 20);
 	assert(menu_main_font_px(720) == 30);
 	assert(menu_main_font_px(1080) == 32);
+	assert(menu_main_font_px(INT_MAX) == 32);
 	assert(menu_small_font_px(20) == 16);
 }
 
