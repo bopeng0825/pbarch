@@ -11,6 +11,7 @@ enum menu_font_role {
 
 #define MENU_FALLBACK_BG 0x18e3
 #define MENU_TEXT_CACHE_LIMIT (512u * 1024u)
+#define MENU_METRIC_CACHE_LIMIT (32u * 1024u)
 
 int menu_sdl2_init(const char *font_path, const char *background_path,
 		   int width, int height);
@@ -29,5 +30,12 @@ void menu_sdl2_copy_background(uint16_t *pixels, int pitch_pixels);
 size_t menu_sdl2_cache_entries(void);
 void menu_sdl2_clear_cache(void);
 void menu_sdl2_finish(void);
+#ifdef MENU_SDL2_TEST
+size_t menu_sdl2_metric_cache_entries(void);
+unsigned menu_sdl2_measure_calls(void);
+#endif
+#ifdef MENU_SDL2_TEST_ALLOC
+void menu_sdl2_test_fail_allocations_after(int count);
+#endif
 
 #endif

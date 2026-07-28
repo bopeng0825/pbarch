@@ -49,7 +49,20 @@ static void test_valid_renderer(void)
 	assert(menu_sdl2_main_font_px() == 20);
 	assert(menu_sdl2_small_font_px() == 16);
 	assert(menu_sdl2_line_height(MENU_FONT_MAIN) > 0);
+#ifdef MENU_SDL2_TEST
+	assert(menu_sdl2_metric_cache_entries() == 0);
+	assert(menu_sdl2_measure_calls() == 0);
+#endif
 	assert(menu_sdl2_text_width(MENU_FONT_MAIN, "Options") > 0);
+#ifdef MENU_SDL2_TEST
+	assert(menu_sdl2_metric_cache_entries() == 1);
+	assert(menu_sdl2_measure_calls() == 1);
+#endif
+	assert(menu_sdl2_text_width(MENU_FONT_MAIN, "Options") > 0);
+#ifdef MENU_SDL2_TEST
+	assert(menu_sdl2_metric_cache_entries() == 1);
+	assert(menu_sdl2_measure_calls() == 1);
+#endif
 	assert(menu_sdl2_draw_text(pixels, 640, MENU_FONT_MAIN, 0, 0,
 				   0xffff, "Options") == 0);
 	entries = menu_sdl2_cache_entries();
@@ -57,9 +70,27 @@ static void test_valid_renderer(void)
 	assert(menu_sdl2_draw_text(pixels, 640, MENU_FONT_MAIN, 0, 0,
 				   0xffff, "Options") == 0);
 	assert(menu_sdl2_cache_entries() == entries);
+#ifdef MENU_SDL2_TEST
+	assert(menu_sdl2_text_width(MENU_FONT_MAIN, "Options") > 0);
+	assert(menu_sdl2_metric_cache_entries() == 1);
+	assert(menu_sdl2_measure_calls() == 1);
+#endif
+#ifdef MENU_SDL2_TEST_ALLOC
+	menu_sdl2_test_fail_allocations_after(0);
+	assert(menu_sdl2_text_width(MENU_FONT_MAIN, "uncached") > 0);
+	assert(menu_sdl2_metric_cache_entries() == 1);
+	assert(menu_sdl2_measure_calls() == 2);
+	assert(menu_sdl2_text_width(MENU_FONT_MAIN, "uncached") > 0);
+	assert(menu_sdl2_metric_cache_entries() == 1);
+	assert(menu_sdl2_measure_calls() == 3);
+	menu_sdl2_test_fail_allocations_after(-1);
+#endif
 
 	menu_sdl2_clear_cache();
 	assert(menu_sdl2_cache_entries() == 0);
+#ifdef MENU_SDL2_TEST
+	assert(menu_sdl2_metric_cache_entries() == 0);
+#endif
 	menu_sdl2_finish();
 }
 

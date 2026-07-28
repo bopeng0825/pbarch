@@ -14,6 +14,21 @@
 
 #define MENU_MAX_DIMENSION 8192
 
+#ifdef MENU_SDL2_TEST_ALLOC
+static int allocations_before_failure = -1;
+
+static void *menu_sdl2_test_malloc(size_t size)
+{
+	if (allocations_before_failure == 0)
+		return NULL;
+	if (allocations_before_failure > 0)
+		allocations_before_failure--;
+	return malloc(size);
+}
+
+#define malloc menu_sdl2_test_malloc
+#endif
+
 struct menu_sdl2_state {
 	int width;
 	int height;
@@ -25,6 +40,10 @@ struct menu_sdl2_state {
 	void *destination_pixels;
 	int destination_pitch;
 	struct text_cache cache;
+	struct text_cache metric_cache;
+#ifdef MENU_SDL2_TEST
+	unsigned measure_calls;
+#endif
 };
 
 static struct menu_sdl2_state state;
@@ -181,6 +200,7 @@ int menu_sdl2_init(const char *font_path, const char *background_path,
 	state.main_px = menu_main_font_px(height);
 	state.small_px = menu_small_font_px(state.main_px);
 	text_cache_init(&state.cache, MENU_TEXT_CACHE_LIMIT, release_surface);
+	text_cache_init(&state.metric_cache, MENU_METRIC_CACHE_LIMIT, free);
 
 	count = (size_t)width * (size_t)height;
 	state.background = malloc(count * sizeof(*state.background));
@@ -243,14 +263,34 @@ int menu_sdl2_line_height(enum menu_font_role role)
 
 int menu_sdl2_text_width(enum menu_font_role role, const char *utf8)
 {
+	int *cached_width;
+	size_t text_bytes;
 	int width;
 
 	if (!role_valid(role) || state.fonts[role] == NULL || utf8 == NULL)
 		return 0;
+	cached_width = text_cache_get(&state.metric_cache, (unsigned)role, 0,
+				      utf8);
+	if (cached_width != NULL)
+		return *cached_width;
+#ifdef MENU_SDL2_TEST
+	state.measure_calls++;
+#endif
 	if (TTF_SizeUTF8(state.fonts[role], utf8, &width, NULL) != 0) {
 		fprintf(stderr, "menu: unable to measure UTF-8 text: %s\n",
 			TTF_GetError());
 		return 0;
+	}
+	text_bytes = strlen(utf8) + 1;
+	if (text_bytes <= SIZE_MAX - sizeof(*cached_width)) {
+		cached_width = malloc(sizeof(*cached_width));
+		if (cached_width != NULL) {
+			*cached_width = width;
+			if (text_cache_put(&state.metric_cache, (unsigned)role, 0,
+					   utf8, cached_width,
+					   sizeof(*cached_width) + text_bytes) != 0)
+				free(cached_width);
+		}
 	}
 	return width;
 }
@@ -335,11 +375,13 @@ size_t menu_sdl2_cache_entries(void)
 void menu_sdl2_clear_cache(void)
 {
 	text_cache_clear(&state.cache);
+	text_cache_clear(&state.metric_cache);
 }
 
 void menu_sdl2_finish(void)
 {
 	text_cache_clear(&state.cache);
+	text_cache_clear(&state.metric_cache);
 	SDL_FreeSurface(state.destination);
 	if (state.fonts[MENU_FONT_MAIN] != NULL)
 		TTF_CloseFont(state.fonts[MENU_FONT_MAIN]);
@@ -348,3 +390,22 @@ void menu_sdl2_finish(void)
 	free(state.background);
 	memset(&state, 0, sizeof(state));
 }
+
+#ifdef MENU_SDL2_TEST
+size_t menu_sdl2_metric_cache_entries(void)
+{
+	return text_cache_count(&state.metric_cache);
+}
+
+unsigned menu_sdl2_measure_calls(void)
+{
+	return state.measure_calls;
+}
+#endif
+
+#ifdef MENU_SDL2_TEST_ALLOC
+void menu_sdl2_test_fail_allocations_after(int count)
+{
+	allocations_before_failure = count;
+}
+#endif
