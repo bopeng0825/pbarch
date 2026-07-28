@@ -60,6 +60,20 @@ class LegacyMenuGeometryTest(unittest.TestCase):
 			"w = menu_text_width(dev_name, 0);",
 		)
 
+	def test_bitmap_geometry_is_restored_before_font_data_is_built(self):
+		init_body = re.search(
+			r"void menu_init_base\(void\)\s*\{(?P<body>.*?)"
+			r"menu_font_data = calloc",
+			MENU_SOURCE,
+			re.DOTALL,
+		)
+		self.assertIsNotNone(init_body)
+		body = init_body.group("body")
+		self.assertIn("me_mfont_w = MENU_X2 ? 16 : 8;", body)
+		self.assertIn("me_mfont_h = MENU_X2 ? 20 : 10;", body)
+		self.assertIn("me_sfont_w = MENU_X2 ? 12 : 6;", body)
+		self.assertIn("me_sfont_h = MENU_X2 ? 20 : 10;", body)
+
 
 if __name__ == "__main__":
 	unittest.main()
