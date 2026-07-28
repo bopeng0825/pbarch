@@ -974,7 +974,7 @@ finish:
 void menu_begin(void)
 {
 #ifdef USE_SDL2
-	if (menu_sdl2_initialized) {
+	if (menu_sdl2_initialized && !drew_alt_bg) {
 		menu_sdl2_copy_background(g_menubg_ptr, g_menuscreen_w);
 		drew_alt_bg = 1;
 	}
@@ -1027,6 +1027,9 @@ void menu_loop(void)
 
 int menu_init(void)
 {
+#ifndef USE_SDL2
+	ui_language_set(UI_LANG_EN);
+#endif
 #ifdef USE_SDL2
 	char font_path[MAX_PATH];
 	char background_path[MAX_PATH];
@@ -1081,8 +1084,12 @@ static void debug_menu_loop(void)
 
 void menu_update_msg(const char *msg)
 {
-	strncpy(menu_error_msg, msg, sizeof(menu_error_msg));
-	menu_error_msg[sizeof(menu_error_msg) - 1] = 0;
+	int max_pixels = g_menuscreen_w - 10;
+
+	if (max_pixels < 0)
+		max_pixels = 0;
+	menu_text_fit(msg, max_pixels, menu_error_msg,
+		      sizeof(menu_error_msg), 0);
 
 	menu_error_time = plat_get_ticks_ms();
 	PA_INFO("%s\n", menu_error_msg);

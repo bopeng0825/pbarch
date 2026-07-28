@@ -7,7 +7,7 @@ SYSROOT   = $(shell $(CC) --print-sysroot)
 
 PROCS     = -j4
 
-SOURCES   = libpicofe/input.c libpicofe/in_sdl.c libpicofe/linux/in_evdev.c libpicofe/linux/plat.c libpicofe/fonts.c libpicofe/readpng.c libpicofe/config_file.c cheat.c config.c content.c core.c menu.c main.c options.c overrides.c patch.c profile.c scale.c unzip.c util.c video.c ui_config.c ui_language.c
+SOURCES   = libpicofe/input.c libpicofe/in_sdl.c libpicofe/linux/in_evdev.c libpicofe/linux/plat.c libpicofe/fonts.c libpicofe/readpng.c libpicofe/config_file.c cheat.c config.c content.c core.c menu.c main.c menu_layout.c options.c overrides.c patch.c profile.c scale.c unzip.c util.c video.c ui_config.c ui_language.c
 
 BIN       = picoarch
 
@@ -150,13 +150,13 @@ else ifeq ($(platform), funkey-s)
 else ifeq ($(platform), h150101)
 	SOURCES := $(filter-out libpicofe/in_sdl.c,$(SOURCES))
 	SOURCES += plat_h150101.c plat_h150101_sdl2_input.c
-	SOURCES += menu_sdl2.c menu_layout.c text_cache.c
+	SOURCES += menu_sdl2.c text_cache.c
 	CFLAGS += -DUSE_SDL2 $(shell $(SYSROOT)/usr/bin/sdl2-config --cflags)
 	CFLAGS += -DCONTENT_DIR='"/mnt"' -DH150101 -march=mips32r2 -mhard-float
 	LDFLAGS += -lSDL2_ttf $(shell $(SYSROOT)/usr/bin/sdl2-config --libs)
 	LDFLAGS += -fPIC
 else ifeq ($(platform), unix)
-	SOURCES += plat_linux.c menu_sdl2.c menu_layout.c text_cache.c
+	SOURCES += plat_linux.c menu_sdl2.c text_cache.c
 	CFLAGS += -DUSE_SDL2 $(shell $(SYSROOT)/usr/bin/sdl2-config --cflags)
 	LDFLAGS += -lSDL2_ttf $(shell $(SYSROOT)/usr/bin/sdl2-config --libs)
 	LDFLAGS += -fPIE
