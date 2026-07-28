@@ -6,6 +6,21 @@ from tools import gen_ui_catalog
 
 
 class CatalogValidationTest(unittest.TestCase):
+	def assert_valid_translation(self, english, translation):
+		with tempfile.TemporaryDirectory() as directory:
+			source = Path(directory) / "ui.tsv"
+			source.write_text(
+				"key\ten\tzh_CN\tzh_TW\n"
+				f"sample\t{english}\t{translation}\t{translation}\n",
+				encoding="utf-8",
+			)
+			original_source = gen_ui_catalog.SOURCE
+			gen_ui_catalog.SOURCE = source
+			try:
+				self.assertEqual(gen_ui_catalog.read_catalog()[0][0], "sample")
+			finally:
+				gen_ui_catalog.SOURCE = original_source
+
 	def assert_invalid_translation(self, english, translation, message):
 		with tempfile.TemporaryDirectory() as directory:
 			source = Path(directory) / "ui.tsv"
@@ -75,6 +90,33 @@ class CatalogValidationTest(unittest.TestCase):
 				self.assertEqual(gen_ui_catalog.read_catalog()[0][0], "sample")
 			finally:
 				gen_ui_catalog.SOURCE = original_source
+
+	def test_accepts_star_width_precision_and_integer_lengths(self):
+		self.assert_valid_translation(
+			"Value %*.*lld of %zu",
+			"值 %*.*lld，共 %zu",
+		)
+
+	def test_rejects_missing_star_argument(self):
+		self.assert_invalid_translation(
+			"Value %*.*lld",
+			"值 %.*lld",
+			"printf signature mismatch",
+		)
+
+	def test_rejects_reordered_star_arguments(self):
+		self.assert_invalid_translation(
+			"Width %*d precision %.*lld",
+			"精度 %.*lld 宽度 %*d",
+			"printf signature mismatch",
+		)
+
+	def test_rejects_integer_length_mismatch(self):
+		self.assert_invalid_translation(
+			"Size %zu value %lld",
+			"大小 %u 值 %ld",
+			"printf signature mismatch",
+		)
 
 
 if __name__ == "__main__":
