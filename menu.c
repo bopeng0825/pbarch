@@ -19,6 +19,7 @@
 #define PXMAKE(r,g,b) ((((r)<<8) & 0xf800)|(((g)<<3) & 0x07e0)|((b)>>3))
 
 static int drew_alt_bg = 0;
+static int full_menu_enabled;
 #ifdef USE_SDL2
 static int menu_sdl2_initialized;
 #endif
@@ -44,6 +45,7 @@ typedef enum
 	MA_MAIN_CHEATS,
 	MA_MAIN_CORE_SEL,
 	MA_MAIN_CONTENT_SEL,
+	MA_MAIN_OPTIONS,
 	MA_MAIN_RESET_GAME,
 	MA_MAIN_CREDITS,
 	MA_MAIN_EXIT,
@@ -937,13 +939,18 @@ static menu_entry e_menu_main[] =
 	mee_handler_id_t(UI_TEXT_LOAD_STATE,    MA_MAIN_LOAD_STATE,  main_menu_handler),
 	mee_handler_id_t(UI_TEXT_DISC_CONTROL,  MA_MAIN_DISC_CTRL,   menu_loop_disc),
 	mee_handler_id_t(UI_TEXT_CHEATS,        MA_MAIN_CHEATS,      menu_loop_cheats),
-	mee_handler_t   (UI_TEXT_OPTIONS,                            menu_loop_options),
+	mee_handler_id_t(UI_TEXT_OPTIONS,        MA_MAIN_OPTIONS,     menu_loop_options),
 	mee_handler_id_t(UI_TEXT_RESET_GAME,    MA_MAIN_RESET_GAME,  main_menu_handler),
 	mee_handler_id_t(UI_TEXT_LOAD_NEW_GAME, MA_MAIN_CONTENT_SEL, menu_loop_select_content),
 	mee_handler_id_t(UI_TEXT_ABOUT,         MA_MAIN_CREDITS,     main_menu_handler),
 	mee_handler_id_t(UI_TEXT_EXIT,          MA_MAIN_EXIT,        main_menu_handler),
 	mee_end,
 };
+
+void menu_set_full_menu(int enabled)
+{
+	full_menu_enabled = enabled != 0;
+}
 
 static void draw_savestate_bg(int slot)
 {
@@ -1002,6 +1009,9 @@ void menu_loop(void)
 	me_enable(e_menu_main, MA_MAIN_CHEATS, cheats != NULL);
 
 	me_enable(e_menu_main, MA_MAIN_DISC_CTRL, needs_disc_ctrl);
+	me_enable(e_menu_main, MA_MAIN_OPTIONS, full_menu_enabled);
+	me_enable(e_menu_main, MA_MAIN_CONTENT_SEL, full_menu_enabled);
+	me_enable(e_menu_main, MA_MAIN_CREDITS, full_menu_enabled);
 
 #ifdef MMENU
 	if (state_allowed()) {

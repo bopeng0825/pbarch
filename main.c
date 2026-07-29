@@ -767,6 +767,7 @@ int main(int argc, char **argv) {
 		printf("Usage: picoarch [--language CODE] [libretro_core [content]]\n");
 		return 1;
 	}
+	menu_set_full_menu(args.full_menu);
 	if (args.show_help) {
 		printf("Usage: picoarch [--language CODE] [libretro_core [content]]\n");
 		return 0;
