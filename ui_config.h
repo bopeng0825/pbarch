@@ -22,6 +22,7 @@ struct app_args {
 	const char *core_path;
 	const char *content_path;
 	int show_help;
+	int full_menu;
 };
 
 int ui_config_parse(const char *text, char *language, size_t language_size);

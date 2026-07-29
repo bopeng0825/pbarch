@@ -25,6 +25,13 @@ int main(void)
 	char *argv2[] = {
 		"picoarch", "--language=zh-CN", "core.so"
 	};
+	char *full_menu_argv[] = {
+		"picoarch", "--full-menu", "--language", "zh_CN",
+		"core.so", "game.rom"
+	};
+	char *repeated_full_menu_argv[] = {
+		"picoarch", "--full-menu", "--full-menu", "core.so"
+	};
 	char *help_argv[] = { "picoarch", "--help" };
 	char *missing_language_argv[] = { "picoarch", "--language" };
 	char *unknown_option_argv[] = { "picoarch", "--bogus" };
@@ -92,9 +99,20 @@ int main(void)
 	assert(selected == UI_LANG_EN);
 
 	assert(app_args_parse(5, argv1, &args) == 0);
+	assert(args.full_menu == 0);
 	assert(strcmp(args.language_override, "zh_TW") == 0);
 	assert(strcmp(args.core_path, "core.so") == 0);
 	assert(strcmp(args.content_path, "game.rom") == 0);
+
+	assert(app_args_parse(6, full_menu_argv, &args) == 0);
+	assert(args.full_menu == 1);
+	assert(strcmp(args.language_override, "zh_CN") == 0);
+	assert(strcmp(args.core_path, "core.so") == 0);
+	assert(strcmp(args.content_path, "game.rom") == 0);
+
+	assert(app_args_parse(4, repeated_full_menu_argv, &args) == 0);
+	assert(args.full_menu == 1);
+	assert(strcmp(args.core_path, "core.so") == 0);
 
 	assert(app_args_parse(3, argv2, &args) == 0);
 	assert(strcmp(args.language_override, "zh-CN") == 0);

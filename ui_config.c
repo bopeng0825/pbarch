@@ -160,6 +160,8 @@ int app_args_parse(int argc, char **argv, struct app_args *out)
 			if (arg[strlen("--language=")] == '\0')
 				return -1;
 			out->language_override = arg + strlen("--language=");
+		} else if (strcmp(arg, "--full-menu") == 0) {
+			out->full_menu = 1;
 		} else if (arg[0] == '-') {
 			return -1;
 		} else if (positional_count == 0) {
