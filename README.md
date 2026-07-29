@@ -12,6 +12,13 @@ picoarch can be run by specifying the core library and the content to run:
 
 If you do not specify core or content, picoarch will have you select a core from the current directory and content using the built-in file browser.
 
+The compact menu used by default hides Options, Load new game, and About.
+Pass `--full-menu` to show those entries:
+
+```
+./picoarch --full-menu /path/to/core_name_libretro.so /path/to/game.gba
+```
+
 ### Menu language and SDL2 skin
 
 The frontend menu defaults to English. To select a language persistently,

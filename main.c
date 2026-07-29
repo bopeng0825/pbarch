@@ -764,12 +764,12 @@ int main(int argc, char **argv) {
 	install_signal_handlers();
 
 	if (app_args_parse(argc, argv, &args) != 0) {
-		printf("Usage: picoarch [--language CODE] [libretro_core [content]]\n");
+		printf("Usage: picoarch [--full-menu] [--language CODE] [libretro_core [content]]\n");
 		return 1;
 	}
 	menu_set_full_menu(args.full_menu);
 	if (args.show_help) {
-		printf("Usage: picoarch [--language CODE] [libretro_core [content]]\n");
+		printf("Usage: picoarch [--full-menu] [--language CODE] [libretro_core [content]]\n");
 		return 0;
 	}
 

@@ -28,6 +28,16 @@ class FullMenuVisibilityTest(unittest.TestCase):
 			r"menu_set_full_menu\(args\.full_menu\);",
 		)
 
+	def test_full_menu_is_discoverable_in_usage_and_readme(self):
+		source = (ROOT / "main.c").read_text(encoding="utf-8")
+		usage = "Usage: picoarch [--full-menu] [--language CODE] [libretro_core [content]]"
+		self.assertEqual(source.count(usage), 2)
+
+		readme = (ROOT / "README.md").read_text(encoding="utf-8")
+		self.assertIn("compact menu", readme.lower())
+		self.assertIn("Options, Load new game, and About", readme)
+		self.assertIn("`--full-menu`", readme)
+
 
 if __name__ == "__main__":
 	unittest.main()
