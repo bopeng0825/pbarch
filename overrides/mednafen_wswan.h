@@ -15,6 +15,7 @@ static const struct core_override_option mednafen_wswan_core_option_overrides[] 
 		.key = "wswan_gfx_colors",
 		.desc = "Color Depth",
 		.info = "24-bit is slower and not available on all platforms. Restart required.",
+		.default_value = "16bit",
 		.options = {
 			{ "16bit", "16-bit" },
 			{ "24bit", "24-bit" },
@@ -23,6 +24,7 @@ static const struct core_override_option mednafen_wswan_core_option_overrides[] 
 	{
 		.key = "wswan_frameskip",
 		.info = "Skip frames to avoid audio crackling. Improves performance at the expense of visual smoothness.",
+		.default_value = "auto",
 	},
 	{
 		.key = "wswan_frameskip_threshold",
@@ -37,6 +39,7 @@ static const struct core_override_option mednafen_wswan_core_option_overrides[] 
 	{
 		.key = "wswan_sound_sample_rate",
 		.desc = "Sample Rate",
+		.default_value = "22050",
 	},
 	{ NULL }
 };
