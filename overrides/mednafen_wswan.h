@@ -24,7 +24,7 @@ static const struct core_override_option mednafen_wswan_core_option_overrides[] 
 	{
 		.key = "wswan_frameskip",
 		.info = "Skip frames to avoid audio crackling. Improves performance at the expense of visual smoothness.",
-		.default_value = "auto",
+		.default_value = "disabled",
 	},
 	{
 		.key = "wswan_frameskip_threshold",
