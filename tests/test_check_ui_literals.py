@@ -123,6 +123,20 @@ class IntegrationGuardTests(unittest.TestCase):
             )
         )
 
+    def test_key_config_overlay_is_last_before_menu_protection(self):
+        self.assertTrue(
+            check_ui_literals.key_config_overlay_is_last_before_menu_protection(
+                self.main_source
+            )
+        )
+
+    def test_key_config_open_failure_preserves_normal_keys(self):
+        self.assertTrue(
+            check_ui_literals.key_config_open_failure_preserves_normal_keys(
+                self.main_source
+            )
+        )
+
     def test_ordinary_sdl_list_clips_long_text_and_rows(self):
         self.assertTrue(
             check_ui_literals.ordinary_sdl_list_clips_text_and_rows(

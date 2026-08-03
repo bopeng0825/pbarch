@@ -443,7 +443,7 @@ static void load_new_content(const char *fname) {
 	}
 
 	load_config();
-	load_config_keys();
+	load_config_keys(NULL);
 
 	if (g_autostateld_opt) {
 		resume_slot = 0;

@@ -63,7 +63,7 @@ int screenshot(void);
 void set_defaults(void);
 int save_config(config_type config_type);
 void load_config(void);
-void load_config_keys(void);
+void load_config_keys(const char *key_config_path);
 int remove_config(config_type config_type);
 
 void handle_emu_action(emu_action action);

@@ -404,7 +404,43 @@ void load_config(void)
 	plat_reinit();
 }
 
-void load_config_keys(void)
+static void load_key_config_overlay(const char *key_config_path)
+{
+	FILE *config_file;
+	char *config;
+	long length;
+
+	if (!key_config_path)
+		return;
+
+	config_file = fopen(key_config_path, "rb");
+	if (!config_file) {
+		PA_WARN("Couldn't load key config %s\n", key_config_path);
+		return;
+	}
+
+	if (fseek(config_file, 0, SEEK_END) != 0 ||
+		(length = ftell(config_file)) < 0 ||
+		fseek(config_file, 0, SEEK_SET) != 0) {
+		PA_WARN("Couldn't load key config %s\n", key_config_path);
+		fclose(config_file);
+		return;
+	}
+
+	config = calloc(1, length + 1);
+	if (!config || fread(config, 1, length, config_file) != (size_t)length) {
+		PA_WARN("Couldn't load key config %s\n", key_config_path);
+		free(config);
+		fclose(config_file);
+		return;
+	}
+
+	fclose(config_file);
+	config_read_keys(config);
+	free(config);
+}
+
+void load_config_keys(const char *key_config_path)
 {
 	char *config = NULL;
 	int kcount = 0;
@@ -415,30 +451,32 @@ void load_config_keys(void)
 	if (config) {
 		config_read_keys(config);
 		free(config);
+	}
 
-		/* Force input device 0 menu to be bound to the default key */
-		in_get_config(0, IN_CFG_BIND_COUNT, &kcount);
-		defbinds = in_get_dev_def_binds(0);
+	load_key_config_overlay(key_config_path);
 
-		for(int i = 0; i < kcount; i++) {
-			if (defbinds[IN_BIND_OFFS(i, IN_BINDTYPE_EMU)] == 1 << EACTION_MENU) {
-				in_bind_key(0, i, 1 << EACTION_MENU, IN_BINDTYPE_EMU, 0);
-			}
-#ifdef FUNKEY_S
-			/* Force fn+down to be bound to standard change scaler action */
-			if (defbinds[IN_BIND_OFFS(i, IN_BINDTYPE_EMU)] == 1 << EACTION_NEXT_SCALER) {
-				in_bind_key(0, i, 1 << EACTION_NEXT_SCALER, IN_BINDTYPE_EMU, 0);
-			}
-			/* Force fn+j to be bound to decrease zoom level (-10%) */
-			if (defbinds[IN_BIND_OFFS(i, IN_BINDTYPE_EMU)] == 1 << EACTION_PREVIOUS_ZOOM_STEP) {
-				in_bind_key(0, i, 1 << EACTION_PREVIOUS_ZOOM_STEP, IN_BINDTYPE_EMU, 0);
-			}
-			/* Force fn+i to be bound to increase zoom level (+10%) */
-			if (defbinds[IN_BIND_OFFS(i, IN_BINDTYPE_EMU)] == 1 << EACTION_NEXT_ZOOM_STEP) {
-				in_bind_key(0, i, 1 << EACTION_NEXT_ZOOM_STEP, IN_BINDTYPE_EMU, 0);
-			}
-#endif
+	/* Force input device 0 menu to be bound to the default key */
+	in_get_config(0, IN_CFG_BIND_COUNT, &kcount);
+	defbinds = in_get_dev_def_binds(0);
+
+	for(int i = 0; i < kcount; i++) {
+		if (defbinds[IN_BIND_OFFS(i, IN_BINDTYPE_EMU)] == 1 << EACTION_MENU) {
+			in_bind_key(0, i, 1 << EACTION_MENU, IN_BINDTYPE_EMU, 0);
 		}
+#ifdef FUNKEY_S
+		/* Force fn+down to be bound to standard change scaler action */
+		if (defbinds[IN_BIND_OFFS(i, IN_BINDTYPE_EMU)] == 1 << EACTION_NEXT_SCALER) {
+			in_bind_key(0, i, 1 << EACTION_NEXT_SCALER, IN_BINDTYPE_EMU, 0);
+		}
+		/* Force fn+j to be bound to decrease zoom level (-10%) */
+		if (defbinds[IN_BIND_OFFS(i, IN_BINDTYPE_EMU)] == 1 << EACTION_PREVIOUS_ZOOM_STEP) {
+			in_bind_key(0, i, 1 << EACTION_PREVIOUS_ZOOM_STEP, IN_BINDTYPE_EMU, 0);
+		}
+		/* Force fn+i to be bound to increase zoom level (+10%) */
+		if (defbinds[IN_BIND_OFFS(i, IN_BINDTYPE_EMU)] == 1 << EACTION_NEXT_ZOOM_STEP) {
+			in_bind_key(0, i, 1 << EACTION_NEXT_ZOOM_STEP, IN_BINDTYPE_EMU, 0);
+		}
+#endif
 	}
 }
 
@@ -856,7 +894,7 @@ int main(int argc, char **argv) {
 
 	core_save_last_opened(content);
 
-	load_config_keys();
+	load_config_keys(args.key_config_path);
 
 #ifdef MMENU
 	mmenu = dlopen("libmmenu.so", RTLD_LAZY);

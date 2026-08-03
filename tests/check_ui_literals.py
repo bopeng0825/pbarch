@@ -304,6 +304,46 @@ def menu_action_captures_core_frame(main_source: str, plat_source: str) -> bool:
     )
 
 
+def key_config_overlay_is_last_before_menu_protection(source: str) -> bool:
+    loader = _function_body(
+        source, r"void\s+load_config_keys\s*\(\s*const\s+char\s*\*\s*key_config_path\s*\)"
+    )
+    main = _function_body(source, r"int\s+main\s*\([^)]*\)")
+    if loader is None or main is None:
+        return False
+
+    normal = loader.find("config_read_keys(config)")
+    overlay = loader.find("load_key_config_overlay(key_config_path)")
+    protection = loader.find("1 << EACTION_MENU")
+    return (
+        0 <= normal < overlay < protection
+        and "load_config_keys(args.key_config_path)" in main
+    )
+
+
+def key_config_open_failure_preserves_normal_keys(source: str) -> bool:
+    helper = _function_body(
+        source,
+        r"static\s+void\s+load_key_config_overlay\s*\(\s*const\s+char\s*\*\s*key_config_path\s*\)",
+    )
+    if helper is None:
+        return False
+
+    open_failure = re.search(
+        r"if\s*\(\s*!config_file\s*\)\s*\{(?P<body>.*?)\}",
+        helper,
+        re.DOTALL,
+    )
+    return (
+        "fopen(key_config_path" in helper
+        and "Couldn't load key config %s\\n" in helper
+        and "key_config_path" in helper
+        and open_failure is not None
+        and "return;" in open_failure.group("body")
+        and "config_read_keys" in helper
+    )
+
+
 def ordinary_sdl_list_clips_text_and_rows(source: str) -> bool:
     body = _function_body(source, r"static\s+void\s+me_draw\b[^{]*")
     text_body = _function_body(source, r"void\s+text_out16\b\s*\([^)]*\)")
