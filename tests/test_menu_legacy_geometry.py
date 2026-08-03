@@ -24,6 +24,16 @@ class LegacyMenuGeometryTest(unittest.TestCase):
 			"wt = strlen(name) * me_mfont_w;",
 			"wt = menu_text_width(name, 0);",
 		)
+
+	def test_list_centering_stays_in_legacy_branch(self):
+		self.assert_non_sdl_branch(
+			"x = g_menuscreen_w / 2 - w / 2;",
+			"x = layout.menu.x + me_mfont_w;",
+		)
+		self.assert_non_sdl_branch(
+			"y = g_menuscreen_h / 2 - h / 2;",
+			"y = menu_centered_block_y(layout.menu.y, layout.menu.h, h);",
+		)
 		self.assert_non_sdl_branch(
 			"wt += 10 * me_mfont_w;",
 			"wt += value_width;",

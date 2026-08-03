@@ -982,7 +982,16 @@ void menu_begin(void)
 {
 #ifdef USE_SDL2
 	if (menu_sdl2_initialized && !drew_alt_bg) {
+		struct menu_responsive_layout layout;
+
+		menu_calculate_responsive_layout(g_menuscreen_w, g_menuscreen_h,
+					 &layout);
 		menu_sdl2_copy_background(g_menubg_ptr, g_menuscreen_w);
+		menu_sdl2_draw_preview(g_menubg_ptr, g_menuscreen_w,
+				       g_menubg_src_ptr, g_menubg_src_w,
+				       g_menubg_src_h, g_menubg_src_pp,
+				       &layout.preview);
+		menu_set_responsive_layout(&layout);
 		drew_alt_bg = 1;
 	}
 #endif
@@ -992,6 +1001,9 @@ void menu_begin(void)
 
 void menu_end(void)
 {
+#ifdef USE_SDL2
+	menu_set_responsive_layout(NULL);
+#endif
 	drew_alt_bg = 0;
 }
 
@@ -1095,6 +1107,13 @@ static void debug_menu_loop(void)
 void menu_update_msg(const char *msg)
 {
 	int max_pixels = g_menuscreen_w - 10;
+#ifdef USE_SDL2
+	struct menu_responsive_layout layout;
+
+	menu_calculate_responsive_layout(g_menuscreen_w, g_menuscreen_h,
+					 &layout);
+	max_pixels = g_menuscreen_w - layout.outer_margin * 2;
+#endif
 
 	if (max_pixels < 0)
 		max_pixels = 0;

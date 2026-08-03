@@ -77,9 +77,37 @@ class IntegrationGuardTests(unittest.TestCase):
             )
         )
 
+    def test_sdl_list_frame_uses_responsive_preview(self):
+        self.assertTrue(
+            check_ui_literals.sdl_list_frame_uses_responsive_preview(
+                self.menu_source
+            )
+        )
+
+    def test_ordinary_sdl_list_uses_responsive_geometry(self):
+        self.assertTrue(
+            check_ui_literals.ordinary_sdl_list_uses_responsive_geometry(
+                self.libpicofe_menu_source
+            )
+        )
+
+    def test_ordinary_sdl_list_omits_permanent_help(self):
+        self.assertTrue(
+            check_ui_literals.ordinary_sdl_list_omits_permanent_help(
+                self.libpicofe_menu_source
+            )
+        )
+
     def test_menu_message_uses_utf8_fitting(self):
         self.assertTrue(
             check_ui_literals.menu_message_uses_utf8_fitting(self.menu_source)
+        )
+
+    def test_sdl_menu_message_uses_outer_margins(self):
+        self.assertTrue(
+            check_ui_literals.sdl_menu_message_uses_outer_margins(
+                self.menu_source
+            )
         )
 
     def test_sdl_unavailable_uses_bitmap_byte_width(self):

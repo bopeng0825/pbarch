@@ -124,6 +124,36 @@ def _read_string(source: str, position: int):
     return None
 
 
+def _function_body(source: str, signature: str):
+    match = re.search(signature + r"\s*\{", source)
+    if match is None:
+        return None
+    depth = 1
+    position = match.end()
+    start = position
+    while position < len(source) and depth:
+        if source.startswith("//", position):
+            position = source.find("\n", position)
+            if position < 0:
+                return source[start:]
+        elif source.startswith("/*", position):
+            position = source.find("*/", position + 2)
+            if position < 0:
+                return None
+            position += 2
+        elif source[position] in ('"', "'"):
+            quote = source[position]
+            position += 1
+            while position < len(source) and source[position] != quote:
+                position += 2 if source[position] == "\\" else 1
+            position += 1
+        else:
+            depth += source[position] == "{"
+            depth -= source[position] == "}"
+            position += 1
+    return source[start : position - 1] if depth == 0 else None
+
+
 def find_prohibited_literals(source: str):
     source = re.sub(r"\\\r?\n", "", source)
     source = _translation_active_source(source)
@@ -178,9 +208,48 @@ def non_sdl_forces_english(source: str) -> bool:
 def background_copy_preserves_alt_preview(source: str) -> bool:
     return re.search(
         r"if\s*\(\s*menu_sdl2_initialized\s*&&\s*!drew_alt_bg\s*\)"
-        r"\s*\{\s*menu_sdl2_copy_background\s*\(",
+        r"\s*\{.*?menu_sdl2_copy_background\s*\(",
         source,
+        re.DOTALL,
     ) is not None
+
+
+def sdl_list_frame_uses_responsive_preview(source: str) -> bool:
+    body = _function_body(source, r"void\s+menu_begin\s*\([^)]*\)")
+    if body is None:
+        return False
+    return all(
+        re.search(pattern, body, re.DOTALL) is not None
+        for pattern in (
+            r"menu_calculate_responsive_layout\s*\(\s*g_menuscreen_w\s*,\s*g_menuscreen_h\s*,",
+            r"menu_sdl2_copy_background\s*\(",
+            r"menu_sdl2_draw_preview\s*\(\s*g_menubg_ptr\s*,\s*g_menuscreen_w\s*,\s*g_menubg_src_ptr\s*,\s*g_menubg_src_w\s*,\s*g_menubg_src_h\s*,\s*g_menubg_src_pp\s*,",
+            r"menu_set_responsive_layout\s*\(",
+        )
+    )
+
+
+def ordinary_sdl_list_uses_responsive_geometry(source: str) -> bool:
+    body = _function_body(source, r"static\s+void\s+me_draw\b[^{]*")
+    if body is None:
+        return False
+    return all(token in body for token in (
+        "menu_get_responsive_layout",
+        "menu_centered_block_y",
+        "layout.menu.x",
+        "layout.menu.w",
+    ))
+
+
+def ordinary_sdl_list_omits_permanent_help(source: str) -> bool:
+    body = _function_body(source, r"static\s+void\s+me_draw\b[^{]*")
+    if body is None:
+        return False
+    return (
+        "menu_error_msg[0] != 0" in body
+        and re.search(r"#ifndef\s+USE_SDL2.*?menu_entry_help", body, re.DOTALL)
+        is not None
+    )
 
 
 def menu_message_uses_utf8_fitting(source: str) -> bool:
@@ -192,6 +261,14 @@ def menu_message_uses_utf8_fitting(source: str) -> bool:
     return function is not None and re.search(
         r"\bmenu_text_fit\s*\(\s*msg\s*,", function.group("body")
     ) is not None
+
+
+def sdl_menu_message_uses_outer_margins(source: str) -> bool:
+    body = _function_body(source, r"void\s+menu_update_msg\s*\([^)]*\)")
+    return body is not None and all(token in body for token in (
+        "menu_calculate_responsive_layout",
+        "layout.outer_margin * 2",
+    ))
 
 
 def sdl_unavailable_uses_bitmap_byte_width(source: str) -> bool:
