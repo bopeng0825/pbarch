@@ -108,6 +108,13 @@ class IntegrationGuardTests(unittest.TestCase):
             )
         )
 
+    def test_sdl_menu_capture_rebuilds_stable_frame_before_readback(self):
+        self.assertTrue(
+            check_ui_literals.sdl_menu_capture_rebuilds_before_readback(
+                self.plat_sdl_source
+            )
+        )
+
     def test_ordinary_sdl_list_clips_long_text_and_rows(self):
         self.assertTrue(
             check_ui_literals.ordinary_sdl_list_clips_text_and_rows(

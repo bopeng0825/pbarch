@@ -661,6 +661,27 @@ static int plat_sdl_readback_rgb565(void *pixels, int pitch)
 	return ret;
 }
 
+static int plat_sdl_capture_menu_frame(void *pixels, int pitch)
+{
+	if (!renderer || !screen_texture_ready)
+		return -1;
+
+	if (SDL_RenderClear(renderer) != 0) {
+		PA_WARN("%s, SDL_RenderClear failed: %s\n",
+			__func__, SDL_GetError());
+		return -1;
+	}
+	if (SDL_RenderCopy(renderer, screen_texture,
+			   screen_use_hw_scaling ? &screen_src_rect : NULL,
+			   screen_use_hw_scaling ? &screen_dst_rect : NULL) != 0) {
+		PA_WARN("%s, SDL_RenderCopy failed: %s\n",
+			__func__, SDL_GetError());
+		return -1;
+	}
+
+	return plat_sdl_readback_rgb565(pixels, pitch);
+}
+
 static int plat_sdl_menu_source_dimensions_match(void)
 {
 	return g_menubg_src_w == SCREEN_WIDTH &&
@@ -930,7 +951,7 @@ void plat_video_menu_enter(int is_rom_loaded)
 			memset(g_menubg_src_ptr, 0,
 			       g_menubg_src_h * g_menubg_src_pp *
 			       sizeof(uint16_t));
-		else if (plat_sdl_readback_rgb565(g_menubg_src_ptr,
+		else if (plat_sdl_capture_menu_frame(g_menubg_src_ptr,
 				 g_menubg_src_pp * sizeof(uint16_t)) != 0)
 			memcpy(g_menubg_src_ptr, screen_pixels,
 			       g_menubg_src_h * g_menubg_src_pp *

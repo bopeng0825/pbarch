@@ -258,12 +258,38 @@ def sdl_menu_enter_captures_completed_frame(source: str) -> bool:
             r"if\s*\(\s*is_rom_loaded\s*\)\s*\{\s*"
             r"if\s*\(\s*!plat_sdl_menu_source_dimensions_match\s*\(\s*\)\s*\)\s*"
             r"memset\s*\(\s*g_menubg_src_ptr\s*,\s*0\s*,.*?"
-            r"else\s+if\s*\(\s*plat_sdl_readback_rgb565\s*\(\s*"
+            r"else\s+if\s*\(\s*plat_sdl_capture_menu_frame\s*\(\s*"
             r"g_menubg_src_ptr\s*,\s*g_menubg_src_pp\s*\*\s*"
             r"sizeof\s*\(\s*uint16_t\s*\)\s*\)\s*!=\s*0\s*\)\s*"
             r"memcpy\s*\(\s*g_menubg_src_ptr\s*,\s*screen_pixels\s*,",
             r"else\s*\{\s*memset\s*\(\s*g_menubg_src_ptr\s*,\s*0\s*,",
         )
+    )
+
+
+def sdl_menu_capture_rebuilds_before_readback(source: str) -> bool:
+    body = _function_body(
+        source, r"static\s+int\s+plat_sdl_capture_menu_frame\s*\([^)]*\)"
+    )
+    menu_enter = _function_body(
+        source, r"void\s+plat_video_menu_enter\s*\([^)]*\)"
+    )
+    if body is None or menu_enter is None:
+        return False
+
+    clear = body.find("SDL_RenderClear(renderer)")
+    copy = body.find("SDL_RenderCopy(renderer, screen_texture")
+    readback = body.find("plat_sdl_readback_rgb565(pixels, pitch)")
+    stable_geometry = all(token in body for token in (
+        "screen_texture_ready",
+        "screen_use_hw_scaling ? &screen_src_rect : NULL",
+        "screen_use_hw_scaling ? &screen_dst_rect : NULL",
+    ))
+    return (
+        stable_geometry
+        and 0 <= clear < copy < readback
+        and "SDL_RenderPresent" not in body
+        and "plat_sdl_capture_menu_frame(g_menubg_src_ptr" in menu_enter
     )
 
 
