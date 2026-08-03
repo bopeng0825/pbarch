@@ -241,6 +241,50 @@ def ordinary_sdl_list_uses_responsive_geometry(source: str) -> bool:
     ))
 
 
+def sdl_menu_enter_captures_completed_frame(source: str) -> bool:
+    body = _function_body(source, r"void\s+plat_video_menu_enter\s*\([^)]*\)")
+    if body is None:
+        return False
+    return (
+        "plat_sdl_readback_screen" in body
+        and re.search(
+            r"memcpy\s*\(\s*g_menubg_src_ptr\s*,\s*screen_pixels\s*,",
+            body,
+        ) is not None
+    )
+
+
+def ordinary_sdl_list_clips_text_and_rows(source: str) -> bool:
+    body = _function_body(source, r"static\s+void\s+me_draw\b[^{]*")
+    text_body = _function_body(source, r"void\s+text_out16\b\s*\([^)]*\)")
+    if body is None or text_body is None:
+        return False
+    return all(token in body for token in (
+        "menu_visible_window",
+        "visible_first",
+        "visible_count",
+    )) and re.search(
+        r"menu_text_clip_right\s*=\s*responsive\s*\?\s*"
+        r"layout\.menu\.x\s*\+\s*layout\.menu\.w",
+        body,
+    ) is not None and "clip_right - x" in text_body
+
+
+def ordinary_sdl_message_is_independent_of_list_height(source: str) -> bool:
+    body = _function_body(source, r"static\s+void\s+me_draw\b[^{]*")
+    if body is None:
+        return False
+    return all(token in body for token in (
+        "int message_margin = responsive ? layout.outer_margin : 5",
+        "g_menuscreen_h - me_mfont_h - message_margin",
+    )) and re.search(
+        r"#ifdef\s+USE_SDL2.*?text_out16\s*\(\s*message_margin,.*?"
+        r"#else.*?if\s*\(h\s*>=",
+        body,
+        re.DOTALL,
+    ) is not None
+
+
 def ordinary_sdl_list_omits_permanent_help(source: str) -> bool:
     body = _function_body(source, r"static\s+void\s+me_draw\b[^{]*")
     if body is None:

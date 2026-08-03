@@ -73,6 +73,21 @@ static void test_responsive_geometry(void)
 	assert(fitted.x == 124 && fitted.y == 50);
 }
 
+static void test_visible_window_keeps_selection_on_screen(void)
+{
+	int first;
+	int count;
+
+	menu_visible_window(20, 0, 5, &first, &count);
+	assert(first == 0 && count == 5);
+	menu_visible_window(20, 7, 5, &first, &count);
+	assert(first == 3 && count == 5);
+	menu_visible_window(3, 2, 5, &first, &count);
+	assert(first == 0 && count == 3);
+	menu_visible_window(20, 19, 5, &first, &count);
+	assert(first == 15 && count == 5);
+}
+
 static void test_utf8_cell_widths(void)
 {
 	assert(menu_utf8_cells("ABC") == 3);
@@ -175,6 +190,7 @@ int main(void)
 {
 	test_font_sizes();
 	test_responsive_geometry();
+	test_visible_window_keeps_selection_on_screen();
 	test_utf8_cell_widths();
 	test_utf8_truncation();
 	test_utf8_truncation_small_destinations();

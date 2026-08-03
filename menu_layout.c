@@ -177,6 +177,33 @@ int menu_centered_block_y(int top, int height, int block_height)
 	return top + (height - block_height) / 2;
 }
 
+void menu_visible_window(int total, int selected, int capacity,
+			 int *first, int *count)
+{
+	int window_first = 0;
+	int window_count;
+
+	if (total < 0)
+		total = 0;
+	window_count = total;
+	if (capacity < 0)
+		capacity = 0;
+	if (window_count > capacity)
+		window_count = capacity;
+	if (selected < 0)
+		selected = 0;
+	if (selected >= total && total > 0)
+		selected = total - 1;
+	if (selected >= window_count)
+		window_first = selected - window_count + 1;
+	if (window_first + window_count > total)
+		window_first = total - window_count;
+	if (first != NULL)
+		*first = window_first;
+	if (count != NULL)
+		*count = window_count;
+}
+
 void menu_aspect_fit(int source_width, int source_height,
 		     const struct menu_rect *bounds, struct menu_rect *fitted)
 {

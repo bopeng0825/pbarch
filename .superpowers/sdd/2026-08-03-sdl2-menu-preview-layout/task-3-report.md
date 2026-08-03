@@ -16,10 +16,10 @@ GREEN 2: the final focused suite passed 20/20, and `tests/check_ui_literals.py` 
 
 ## Verification
 
-- Focused Python contracts: 20/20 pass.
-- Full Python discovery: 32/33 pass. The unrelated existing `test_mednafen_wswan_defaults` fails because `wswan_frameskip` is absent from the current override fixture.
+- Initial focused Python contracts: 20/20 pass; follow-up contracts are recorded below.
+- Initial full Python discovery: 32/33 pass. The unrelated existing `test_mednafen_wswan_defaults` fails because `wswan_frameskip` is absent from the current override fixture.
 - `git diff --check`: pass in both parent and `libpicofe` repositories before commit.
-- Pure C layout test: not runnable because `gcc` is not installed or on `PATH`.
+- Pure C layout test: initially not runnable by command name; the follow-up used the installed MinGW compiler by absolute path.
 - H150101 build: not runnable because `make` is not installed or on `PATH`; therefore the SDL2 compile/link result is unverified in this environment.
 
 ## Commits
@@ -30,11 +30,40 @@ GREEN 2: the final focused suite passed 20/20, and `tests/check_ui_literals.py` 
 ## Self-review
 
 - The activation API is SDL2-only and narrowly scoped to `me_draw`; confirmation boxes, ROM selection, bindings, credits, save-state pages, and other specialized functions retain their geometry.
-- `drew_alt_bg` still prevents the frame preview from replacing a selected save-state screenshot until the modal flow ends.
+- `drew_alt_bg` prevents the frame preview from replacing a selected save-state screenshot within the current frame; its precise frame-scoped behavior is corrected below.
 - Preview failure is deliberately ignored after the skin copy, leaving a valid background.
 - Legacy whole-screen `x/y` centering remains under `#else` and is covered by a source contract.
 - An initial misplaced `#endif` found during diff review was corrected before commit and focused verification rerun.
 
 ## Concerns
 
-The environment has neither a C compiler nor Make, so compiler warnings, SDL2 headers/libraries, and the final H150101 binary could not be verified here. The full Python suite also has one unrelated WonderSwan override-fixture failure as noted above.
+Make and the H150101 cross-build environment are unavailable, so the final SDL2 target binary could not be verified here. The full Python suite also has one unrelated WonderSwan override-fixture failure as noted above.
+
+## Review-blocker follow-up
+
+The first review found that the preview source was cleared at SDL2 menu entry, text could extend past the menu column, long lists still drew every row, and temporary messages disappeared when the list filled the available height.
+
+Root-cause tracing showed that hardware-scaled and XRGB frames only have a completed RGB565 representation in the renderer output. SDL2 menu entry now reads the last presented renderer output as RGB565 before changing to the menu texture, copies it into `g_menubg_src_ptr`, and lets the existing preview compositor consume that stable copy. The software-rendered `screen_pixels` buffer remains the fallback when renderer readback fails.
+
+Ordinary SDL2 list text now fits against a temporary right clip at the menu rectangle edge. A tested `menu_visible_window` helper limits drawing to complete rows and shifts the window only enough to keep the selected enabled row visible. Timed messages reset to a full-output clip and draw at the responsive outer margin independently of list height.
+
+Follow-up RED evidence:
+
+- Three new focused Python contracts failed for completed-frame capture, text/row containment, and full-height message visibility.
+- The new pure-C visible-window behavior test failed to compile before its API and implementation existed.
+
+Follow-up GREEN evidence:
+
+- Focused Python contracts pass 23/23.
+- `test_menu_layout.c` compiles with MinGW GCC 9.2.0 and passes. The compiler required its `bin` directory on `PATH` so the `cc1` runtime DLLs could be found.
+- Full Python discovery passes 36/37; the sole failure remains the pre-existing `wswan_frameskip` fixture issue.
+- Parent and submodule `git diff --check` pass.
+
+Follow-up commits:
+
+- `libpicofe`: `3e0f4ff contain responsive SDL2 list content` on `codex/sdl2-menu-preview-layout`.
+- Parent repository: the follow-up commit records the renderer capture, visible-window helper, contracts, report, and updated submodule pointer.
+
+Correction to the earlier self-review: `drew_alt_bg` is frame-scoped because `menu_end` resets it after each menu frame. This is sufficient for the existing save-state page: that page reloads its selected screenshot before every frame, so `menu_begin` preserves it for that frame. It does not need to persist across the entire modal flow.
+
+The H150101 build remains unavailable because `make` and the target SDL2 cross-build environment are not installed on `PATH` in this session.

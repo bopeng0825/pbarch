@@ -64,6 +64,9 @@ class IntegrationGuardTests(unittest.TestCase):
         cls.libpicofe_menu_source = (
             ROOT / "libpicofe" / "menu.c"
         ).read_text(encoding="utf-8")
+        cls.plat_sdl_source = (ROOT / "plat_sdl.c").read_text(
+            encoding="utf-8"
+        )
 
     def test_non_sdl_build_forces_english(self):
         self.assertTrue(
@@ -94,6 +97,27 @@ class IntegrationGuardTests(unittest.TestCase):
     def test_ordinary_sdl_list_omits_permanent_help(self):
         self.assertTrue(
             check_ui_literals.ordinary_sdl_list_omits_permanent_help(
+                self.libpicofe_menu_source
+            )
+        )
+
+    def test_sdl_menu_enter_captures_completed_frame(self):
+        self.assertTrue(
+            check_ui_literals.sdl_menu_enter_captures_completed_frame(
+                self.plat_sdl_source
+            )
+        )
+
+    def test_ordinary_sdl_list_clips_long_text_and_rows(self):
+        self.assertTrue(
+            check_ui_literals.ordinary_sdl_list_clips_text_and_rows(
+                self.libpicofe_menu_source
+            )
+        )
+
+    def test_ordinary_sdl_message_is_independent_of_list_height(self):
+        self.assertTrue(
+            check_ui_literals.ordinary_sdl_message_is_independent_of_list_height(
                 self.libpicofe_menu_source
             )
         )

@@ -917,10 +917,12 @@ void plat_video_menu_enter(int is_rom_loaded)
 
 	plat_sound_pause();
 
-	memset(g_menubg_src_ptr, 0,
-	       g_menubg_src_h * g_menubg_src_pp * sizeof(uint16_t));
-
 #ifdef USE_SDL2
+	if (is_rom_loaded) {
+		plat_sdl_readback_screen();
+		memcpy(g_menubg_src_ptr, screen_pixels,
+		       g_menubg_src_h * g_menubg_src_pp * sizeof(uint16_t));
+	}
 	/* Menu draws into screen_pixels; force fb_flip() to upload that full-screen buffer instead of reusing the game texture. */
 	if (plat_sdl_ensure_screen_texture(SCREEN_WIDTH, SCREEN_HEIGHT,
 					       SCREEN_PITCH, SDL_PIXELFORMAT_RGB565,
@@ -929,6 +931,9 @@ void plat_video_menu_enter(int is_rom_loaded)
 		screen_last_dst_rect_valid = false;
 		need_full_clear = 1;
 	}
+#else
+	memset(g_menubg_src_ptr, 0,
+	       g_menubg_src_h * g_menubg_src_pp * sizeof(uint16_t));
 #endif
 	g_menuscreen_ptr = fb_flip();
 }
