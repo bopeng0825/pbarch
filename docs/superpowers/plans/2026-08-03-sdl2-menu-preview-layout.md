@@ -248,7 +248,7 @@ Run all Python tests, the layout C test, the SDL2 renderer C test under the dumm
 
 - [ ] **Step 2: Inspect both target layouts**
 
-Exercise or instrument 640x480 and 1280x720 outputs and verify: stable left text origin, vertically centered item block, preview frames of 336x252 and 504x378 respectively, aspect-correct game image, no border, no permanent help line, visible temporary messages, and one-column fallback on a narrow output.
+Exercise or instrument 640x480 and 1280x720 outputs and verify: stable left text origin, vertically centered item block, preview frames of 328x246 (with a 20-pixel column gap) and 504x378 respectively, aspect-correct game image, no border, no permanent help line, visible temporary messages, and one-column fallback on a narrow output.
 
 - [ ] **Step 3: Check special pages and failure fallback**
 

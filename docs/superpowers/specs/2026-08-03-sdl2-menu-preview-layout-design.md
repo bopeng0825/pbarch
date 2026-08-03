@@ -26,10 +26,10 @@ entry or output-size change. It must not contain coordinates specific to
   font widths wide. Otherwise the preview is hidden and the menu becomes a
   single column.
 
-At 640x480 the main font is 20 pixels and the target preview frame is about
-336x252. At 1280x720 the main font is 30 pixels and the target preview frame is
-about 504x378. Extra horizontal space at 1280x720 remains balanced whitespace;
-it does not enlarge or stretch the text.
+At 640x480 the main font is 20 pixels and the target preview frame is
+328x246, with a 20-pixel column gap. At 1280x720 the main font is 30 pixels and
+the target preview frame is 504x378. Extra horizontal space at 1280x720 remains
+balanced whitespace; it does not enlarge or stretch the text.
 
 ## Preview
 
