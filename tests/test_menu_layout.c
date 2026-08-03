@@ -27,6 +27,40 @@ static void test_font_sizes(void)
 	assert(menu_small_font_px(20) == 16);
 }
 
+static void test_responsive_geometry(void)
+{
+	struct menu_responsive_layout layout;
+	struct menu_rect fitted;
+
+	menu_calculate_responsive_layout(640, 480, &layout);
+	assert(layout.main_font_px == 20);
+	assert(layout.outer_margin == 20);
+	assert(layout.show_preview == 1);
+	assert(layout.preview.w == 336);
+	assert(layout.preview.h == 252);
+
+	menu_calculate_responsive_layout(1280, 720, &layout);
+	assert(layout.main_font_px == 30);
+	assert(layout.preview.w == 504);
+	assert(layout.preview.h == 378);
+
+	menu_calculate_responsive_layout(320, 240, &layout);
+	assert(layout.show_preview == 0);
+	assert(layout.preview.w == 0 && layout.preview.h == 0);
+
+	assert(menu_centered_block_y(20, 440, 148) == 166);
+	assert(menu_centered_block_y(20, 100, 120) == 20);
+
+	layout.preview.x = 100;
+	layout.preview.y = 50;
+	layout.preview.w = 336;
+	layout.preview.h = 252;
+	menu_aspect_fit(256, 224, &layout.preview, &fitted);
+	assert(fitted.h == 252);
+	assert(fitted.w == 288);
+	assert(fitted.x == 124 && fitted.y == 50);
+}
+
 static void test_utf8_cell_widths(void)
 {
 	assert(menu_utf8_cells("ABC") == 3);
@@ -128,6 +162,7 @@ static void test_width_fitting_uses_supplied_pixel_measurement(void)
 int main(void)
 {
 	test_font_sizes();
+	test_responsive_geometry();
 	test_utf8_cell_widths();
 	test_utf8_truncation();
 	test_utf8_truncation_small_destinations();

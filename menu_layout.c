@@ -1,6 +1,7 @@
 #include "menu_layout.h"
 
 #include <limits.h>
+#include <stdint.h>
 #include <string.h>
 
 #define REPLACEMENT_CODEPOINT 0xfffd
@@ -107,6 +108,100 @@ int menu_main_font_px(int menu_height)
 int menu_small_font_px(int main_px)
 {
 	return (main_px * 4 + 2) / 5;
+}
+
+void menu_calculate_responsive_layout(int output_width, int output_height,
+				      struct menu_responsive_layout *layout)
+{
+	int usable_width;
+	int content_height;
+	int menu_width;
+	int preview_column_width;
+	int minimum_width;
+	int preview_width;
+
+	if (layout == NULL)
+		return;
+	if (output_width < 0)
+		output_width = 0;
+	if (output_height < 0)
+		output_height = 0;
+
+	memset(layout, 0, sizeof(*layout));
+	layout->output_width = output_width;
+	layout->output_height = output_height;
+	layout->main_font_px = menu_main_font_px(output_height);
+	layout->small_font_px = menu_small_font_px(layout->main_font_px);
+	layout->outer_margin = layout->main_font_px;
+	layout->column_gap = layout->main_font_px * 3 / 5;
+
+	usable_width = output_width - 2 * layout->outer_margin;
+	content_height = output_height - 2 * layout->outer_margin;
+	if (usable_width < 0)
+		usable_width = 0;
+	if (content_height < 0)
+		content_height = 0;
+	menu_width = usable_width * 42 / 100;
+	preview_column_width = usable_width - layout->column_gap - menu_width;
+	if (preview_column_width < 0)
+		preview_column_width = 0;
+	minimum_width = 12 * layout->main_font_px;
+	layout->show_preview = menu_width >= minimum_width &&
+		preview_column_width >= minimum_width;
+
+	layout->menu.x = layout->outer_margin;
+	layout->menu.y = layout->outer_margin;
+	layout->menu.w = layout->show_preview ? menu_width : usable_width;
+	layout->menu.h = content_height;
+	if (!layout->show_preview)
+		return;
+
+	preview_width = output_height * 7 / 10;
+	if (preview_width > preview_column_width)
+		preview_width = preview_column_width;
+	if (preview_width > content_height * 4 / 3)
+		preview_width = content_height * 4 / 3;
+	preview_width &= ~3;
+	layout->preview.w = preview_width;
+	layout->preview.h = preview_width * 3 / 4;
+	layout->preview.x = layout->outer_margin + menu_width +
+		layout->column_gap + (preview_column_width - preview_width) / 2;
+	layout->preview.y = layout->outer_margin +
+		(content_height - layout->preview.h) / 2;
+}
+
+int menu_centered_block_y(int top, int height, int block_height)
+{
+	if (height <= 0 || block_height <= 0 || block_height > height)
+		return top;
+	return top + (height - block_height) / 2;
+}
+
+void menu_aspect_fit(int source_width, int source_height,
+		     const struct menu_rect *bounds, struct menu_rect *fitted)
+{
+	int width;
+	int height;
+
+	if (fitted == NULL)
+		return;
+	memset(fitted, 0, sizeof(*fitted));
+	if (bounds == NULL || source_width <= 0 || source_height <= 0 ||
+	    bounds->w <= 0 || bounds->h <= 0)
+		return;
+
+	if ((int64_t)bounds->w * source_height <=
+	    (int64_t)bounds->h * source_width) {
+		width = bounds->w;
+		height = (int)((int64_t)width * source_height / source_width);
+	} else {
+		height = bounds->h;
+		width = (int)((int64_t)height * source_width / source_height);
+	}
+	fitted->x = bounds->x + (bounds->w - width) / 2;
+	fitted->y = bounds->y + (bounds->h - height) / 2;
+	fitted->w = width;
+	fitted->h = height;
 }
 
 size_t menu_utf8_cells(const char *text)
