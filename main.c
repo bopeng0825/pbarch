@@ -1,6 +1,7 @@
 #include <png.h>
 #include <signal.h>
 #include <stdarg.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
@@ -409,6 +410,7 @@ static void load_key_config_overlay(const char *key_config_path)
 	FILE *config_file;
 	char *config;
 	long length;
+	size_t config_size;
 
 	if (!key_config_path)
 		return;
@@ -427,7 +429,14 @@ static void load_key_config_overlay(const char *key_config_path)
 		return;
 	}
 
-	config = calloc(1, length + 1);
+	if ((uintmax_t)length >= (uintmax_t)SIZE_MAX) {
+		PA_WARN("Couldn't load key config %s\n", key_config_path);
+		fclose(config_file);
+		return;
+	}
+
+	config_size = (size_t)length + 1;
+	config = calloc(1, config_size);
 	if (!config || fread(config, 1, length, config_file) != (size_t)length) {
 		PA_WARN("Couldn't load key config %s\n", key_config_path);
 		free(config);

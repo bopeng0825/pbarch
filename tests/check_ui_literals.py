@@ -304,7 +304,9 @@ def menu_action_captures_core_frame(main_source: str, plat_source: str) -> bool:
     )
 
 
-def key_config_overlay_is_last_before_menu_protection(source: str) -> bool:
+def key_config_overlay_is_last_before_menu_protection(
+    source: str, menu_source: str
+) -> bool:
     loader = _function_body(
         source, r"void\s+load_config_keys\s*\(\s*const\s+char\s*\*\s*key_config_path\s*\)"
     )
@@ -318,6 +320,7 @@ def key_config_overlay_is_last_before_menu_protection(source: str) -> bool:
     return (
         0 <= normal < overlay < protection
         and "load_config_keys(args.key_config_path)" in main
+        and "load_config_keys(NULL)" in menu_source
     )
 
 
@@ -341,6 +344,27 @@ def key_config_open_failure_preserves_normal_keys(source: str) -> bool:
         and open_failure is not None
         and "return;" in open_failure.group("body")
         and "config_read_keys" in helper
+    )
+
+
+def key_config_size_is_checked_before_allocation(source: str) -> bool:
+    helper = _function_body(
+        source,
+        r"static\s+void\s+load_key_config_overlay\s*\(\s*const\s+char\s*\*\s*key_config_path\s*\)",
+    )
+    if helper is None:
+        return False
+
+    bound = helper.find("(uintmax_t)length >= (uintmax_t)SIZE_MAX")
+    size = helper.find("config_size = (size_t)length + 1")
+    allocation = helper.find("calloc(1, config_size)")
+    failure = helper[bound:size] if 0 <= bound < size else ""
+    return (
+        0 <= bound < size < allocation
+        and "PA_WARN(" in failure
+        and "fclose(config_file)" in failure
+        and "return;" in failure
+        and "config_read_keys" not in failure
     )
 
 

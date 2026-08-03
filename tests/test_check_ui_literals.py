@@ -126,13 +126,20 @@ class IntegrationGuardTests(unittest.TestCase):
     def test_key_config_overlay_is_last_before_menu_protection(self):
         self.assertTrue(
             check_ui_literals.key_config_overlay_is_last_before_menu_protection(
-                self.main_source
+                self.main_source, self.menu_source
             )
         )
 
     def test_key_config_open_failure_preserves_normal_keys(self):
         self.assertTrue(
             check_ui_literals.key_config_open_failure_preserves_normal_keys(
+                self.main_source
+            )
+        )
+
+    def test_key_config_size_is_checked_before_allocation(self):
+        self.assertTrue(
+            check_ui_literals.key_config_size_is_checked_before_allocation(
                 self.main_source
             )
         )
