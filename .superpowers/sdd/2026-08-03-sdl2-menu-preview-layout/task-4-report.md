@@ -4,8 +4,9 @@
 
 The responsive layout documentation now matches the implemented and tested
 `fba-a320` geometry: 640x480 uses a 328x246 preview with a 20-pixel column gap,
-and 1280x720 uses a 504x378 preview. The design and execution plan previously
-stated the incorrect 336x252 value for 640x480.
+and 1280x720 uses a 504x378 preview. The design and execution plan now use
+these values consistently, including the Task 1 assertions and aspect-fit
+example.
 
 `README.md` was inspected and was not changed. Its SDL2 section describes skin
 assets and deployment only; it does not claim that the menu uses the former
@@ -75,3 +76,16 @@ checks.
 Integration risk remains concentrated in the unavailable full SDL2 compile/link
 and target build, plus unperformed interactive/device validation. The sole
 Python failure is unrelated and was present at the accepted baseline.
+
+## Documentation review follow-up
+
+The first documentation correction missed the Task 1 code sample in the
+execution plan. That sample now asserts the 328x246 frame and uses matching
+328x246 aspect-fit bounds. For a 256x224 source, integer aspect fitting produces
+281x246 at `(123, 50)` inside bounds starting at `(100, 50)`. A fresh text
+search found no remaining obsolete 640x480 preview pair or mismatched aspect-fit
+assertion in the design, plan, or this final report.
+
+This follow-up changes documentation only. It did not rerun unavailable SDL2,
+Make, cross-toolchain, device, or interactive visual verification; the limits
+listed above remain unchanged.

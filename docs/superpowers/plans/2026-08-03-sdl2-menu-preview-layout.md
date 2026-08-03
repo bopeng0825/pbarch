@@ -44,8 +44,8 @@ menu_calculate_responsive_layout(640, 480, &layout);
 assert(layout.main_font_px == 20);
 assert(layout.outer_margin == 20);
 assert(layout.show_preview == 1);
-assert(layout.preview.w == 336);
-assert(layout.preview.h == 252);
+assert(layout.preview.w == 328);
+assert(layout.preview.h == 246);
 
 menu_calculate_responsive_layout(1280, 720, &layout);
 assert(layout.main_font_px == 30);
@@ -60,11 +60,11 @@ assert(menu_centered_block_y(20, 440, 148) == 166);
 assert(menu_centered_block_y(20, 100, 120) == 20);
 
 layout.preview.x = 100; layout.preview.y = 50;
-layout.preview.w = 336; layout.preview.h = 252;
+layout.preview.w = 328; layout.preview.h = 246;
 menu_aspect_fit(256, 224, &layout.preview, &fitted);
-assert(fitted.h == 252);
-assert(fitted.w == 288);
-assert(fitted.x == 124 && fitted.y == 50);
+assert(fitted.h == 246);
+assert(fitted.w == 281);
+assert(fitted.x == 123 && fitted.y == 50);
 ```
 
 - [ ] **Step 2: Compile to verify the new API is missing**
