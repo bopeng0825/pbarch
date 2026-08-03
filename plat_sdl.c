@@ -638,7 +638,7 @@ static int plat_sdl_ensure_screen_texture(unsigned width, unsigned height,
 	return 0;
 }
 
-static int plat_sdl_readback_screen(void)
+static int plat_sdl_readback_rgb565(void *pixels, int pitch)
 {
 	uint64_t start_us;
 	int ret;
@@ -649,7 +649,7 @@ static int plat_sdl_readback_screen(void)
 	if (profile_is_enabled())
 		start_us = plat_get_ticks_us_u64();
 	ret = SDL_RenderReadPixels(renderer, NULL, SDL_PIXELFORMAT_RGB565,
-				   screen_pixels, SCREEN_PITCH);
+				   pixels, pitch);
 	if (ret != 0) {
 		PA_WARN("%s, SDL_RenderReadPixels failed: %s\n",
 			__func__, SDL_GetError());
@@ -659,6 +659,13 @@ static int plat_sdl_readback_screen(void)
 				     &sdl_video_profile.readback_max_us,
 				     plat_get_ticks_us_u64() - start_us);
 	return ret;
+}
+
+static int plat_sdl_menu_source_dimensions_match(void)
+{
+	return g_menubg_src_w == SCREEN_WIDTH &&
+		g_menubg_src_h == SCREEN_HEIGHT &&
+		g_menubg_src_pp == SCREEN_WIDTH;
 }
 #endif
 
@@ -861,7 +868,7 @@ int plat_dump_screen(const char *filename) {
 	} else {
 #ifdef USE_SDL2
 		if (screen_use_hw_scaling)
-			plat_sdl_readback_screen();
+			plat_sdl_readback_rgb565(screen_pixels, SCREEN_PITCH);
 #endif
 		ret = SDL_SaveBMP(screen, imgname);
 	}
@@ -919,8 +926,17 @@ void plat_video_menu_enter(int is_rom_loaded)
 
 #ifdef USE_SDL2
 	if (is_rom_loaded) {
-		plat_sdl_readback_screen();
-		memcpy(g_menubg_src_ptr, screen_pixels,
+		if (!plat_sdl_menu_source_dimensions_match())
+			memset(g_menubg_src_ptr, 0,
+			       g_menubg_src_h * g_menubg_src_pp *
+			       sizeof(uint16_t));
+		else if (plat_sdl_readback_rgb565(g_menubg_src_ptr,
+				 g_menubg_src_pp * sizeof(uint16_t)) != 0)
+			memcpy(g_menubg_src_ptr, screen_pixels,
+			       g_menubg_src_h * g_menubg_src_pp *
+			       sizeof(uint16_t));
+	} else {
+		memset(g_menubg_src_ptr, 0,
 		       g_menubg_src_h * g_menubg_src_pp * sizeof(uint16_t));
 	}
 	/* Menu draws into screen_pixels; force fb_flip() to upload that full-screen buffer instead of reusing the game texture. */

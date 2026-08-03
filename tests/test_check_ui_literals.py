@@ -101,7 +101,7 @@ class IntegrationGuardTests(unittest.TestCase):
             )
         )
 
-    def test_sdl_menu_enter_captures_completed_frame(self):
+    def test_sdl_menu_enter_keeps_readback_and_fallback_sources_separate(self):
         self.assertTrue(
             check_ui_literals.sdl_menu_enter_captures_completed_frame(
                 self.plat_sdl_source

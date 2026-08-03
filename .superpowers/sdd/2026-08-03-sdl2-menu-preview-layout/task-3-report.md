@@ -67,3 +67,17 @@ Follow-up commits:
 Correction to the earlier self-review: `drew_alt_bg` is frame-scoped because `menu_end` resets it after each menu frame. This is sufficient for the existing save-state page: that page reloads its selected screenshot before every frame, so `menu_begin` preserves it for that frame. It does not need to persist across the entire modal flow.
 
 The H150101 build remains unavailable because `make` and the target SDL2 cross-build environment are not installed on `PATH` in this session.
+
+## Review-blocker follow-up 2
+
+The second review identified that renderer readback still targeted `screen_pixels`; a failed `SDL_RenderReadPixels` could therefore partially overwrite the only software fallback before it was copied.
+
+The new contract first failed against that shared-target flow. SDL readback is now parameterized and writes directly to the dedicated `g_menubg_src_ptr` using `g_menubg_src_pp * sizeof(uint16_t)` as its byte pitch. The original `screen_pixels` remains untouched and is copied only when readback reports failure. A dimension guard requires the menu source to match the fixed SDL output before readback; mismatch and `is_rom_loaded == false` both explicitly clear the preview source.
+
+Follow-up 2 RED/GREEN:
+
+- RED: the isolated capture-source contract failed 1/1 against the shared readback/fallback target.
+- A tightened dimension-safety contract also failed before the mismatch branch was separated from the fallback copy.
+- GREEN: focused Python contracts pass 23/23 with distinct success, failure, mismatch, and no-ROM source behavior represented in the contract.
+
+This follow-up changes only the parent repository; the `libpicofe` submodule remains at `3e0f4ff`.

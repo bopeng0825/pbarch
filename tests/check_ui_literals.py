@@ -245,12 +245,25 @@ def sdl_menu_enter_captures_completed_frame(source: str) -> bool:
     body = _function_body(source, r"void\s+plat_video_menu_enter\s*\([^)]*\)")
     if body is None:
         return False
-    return (
-        "plat_sdl_readback_screen" in body
-        and re.search(
+    dimensions = _function_body(
+        source, r"static\s+int\s+plat_sdl_menu_source_dimensions_match\s*\([^)]*\)"
+    )
+    return dimensions is not None and all(token in dimensions for token in (
+        "g_menubg_src_w == SCREEN_WIDTH",
+        "g_menubg_src_h == SCREEN_HEIGHT",
+        "g_menubg_src_pp == SCREEN_WIDTH",
+    )) and all(
+        re.search(pattern, body, re.DOTALL) is not None
+        for pattern in (
+            r"if\s*\(\s*is_rom_loaded\s*\)\s*\{\s*"
+            r"if\s*\(\s*!plat_sdl_menu_source_dimensions_match\s*\(\s*\)\s*\)\s*"
+            r"memset\s*\(\s*g_menubg_src_ptr\s*,\s*0\s*,.*?"
+            r"else\s+if\s*\(\s*plat_sdl_readback_rgb565\s*\(\s*"
+            r"g_menubg_src_ptr\s*,\s*g_menubg_src_pp\s*\*\s*"
+            r"sizeof\s*\(\s*uint16_t\s*\)\s*\)\s*!=\s*0\s*\)\s*"
             r"memcpy\s*\(\s*g_menubg_src_ptr\s*,\s*screen_pixels\s*,",
-            body,
-        ) is not None
+            r"else\s*\{\s*memset\s*\(\s*g_menubg_src_ptr\s*,\s*0\s*,",
+        )
     )
 
 
