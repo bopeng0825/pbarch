@@ -305,6 +305,53 @@ uint32_t menu_sdl2_scale_coordinate(uint32_t coordinate,
 			  destination_size);
 }
 
+int menu_sdl2_draw_preview(uint16_t *destination, int destination_pitch,
+			   const uint16_t *source, int source_width,
+			   int source_height, int source_pitch,
+			   const struct menu_rect *bounds)
+{
+	struct menu_rect fitted;
+	int destination_height;
+	int y;
+
+	if (destination == NULL || source == NULL || bounds == NULL ||
+	    source_width <= 0 || source_height <= 0 ||
+	    source_pitch < source_width || bounds->x < 0 || bounds->y < 0 ||
+	    bounds->w <= 0 || bounds->h <= 0 ||
+	    bounds->x > INT_MAX - bounds->w ||
+	    bounds->y > INT_MAX - bounds->h)
+		return -1;
+
+	menu_aspect_fit(source_width, source_height, bounds, &fitted);
+	if (fitted.w <= 0 || fitted.h <= 0 ||
+	    fitted.x > INT_MAX - fitted.w || fitted.y > INT_MAX - fitted.h ||
+	    destination_pitch < fitted.x + fitted.w)
+		return -1;
+	destination_height = fitted.y + fitted.h;
+	if (!framebuffer_span_valid(source_pitch, source_height) ||
+	    !framebuffer_span_valid(destination_pitch, destination_height))
+		return -1;
+
+	for (y = 0; y < fitted.h; y++) {
+		uint32_t source_y = menu_sdl2_scale_coordinate(
+			(uint32_t)y, (uint32_t)source_height,
+			(uint32_t)fitted.h);
+		int x;
+
+		for (x = 0; x < fitted.w; x++) {
+			uint32_t source_x = menu_sdl2_scale_coordinate(
+				(uint32_t)x, (uint32_t)source_width,
+				(uint32_t)fitted.w);
+
+			destination[(size_t)(fitted.y + y) *
+				    (size_t)destination_pitch + fitted.x + x] =
+				source[(size_t)source_y * (size_t)source_pitch +
+				       source_x];
+		}
+	}
+	return 0;
+}
+
 int menu_sdl2_draw_text(uint16_t *pixels, int pitch_pixels,
 			enum menu_font_role role, int x, int y,
 			uint16_t color, const char *utf8)

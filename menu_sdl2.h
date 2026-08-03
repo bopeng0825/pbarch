@@ -4,6 +4,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "menu_layout.h"
+
 enum menu_font_role {
 	MENU_FONT_MAIN = 0,
 	MENU_FONT_SMALL
@@ -23,6 +25,10 @@ int menu_sdl2_text_width(enum menu_font_role role, const char *utf8);
 uint32_t menu_sdl2_scale_coordinate(uint32_t coordinate,
 				    uint32_t source_size,
 				    uint32_t destination_size);
+int menu_sdl2_draw_preview(uint16_t *destination, int destination_pitch,
+			   const uint16_t *source, int source_width,
+			   int source_height, int source_pitch,
+			   const struct menu_rect *bounds);
 int menu_sdl2_draw_text(uint16_t *pixels, int pitch_pixels,
 			enum menu_font_role role, int x, int y,
 			uint16_t color, const char *utf8);

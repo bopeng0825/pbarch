@@ -197,6 +197,52 @@ static void test_rejects_overflowing_framebuffer_span(void)
 			      "skin/background.png", 1, INT_MAX) == -1);
 }
 
+static void test_preview_is_aspect_fitted_and_respects_pitch(void)
+{
+	static const uint16_t source[6 * 2] = {
+		0x0001, 0x0002, 0x0003, 0x0004, 0xeeee, 0xeeee,
+		0x0011, 0x0012, 0x0013, 0x0014, 0xeeee, 0xeeee
+	};
+	struct menu_rect bounds = { 2, 0, 4, 4 };
+	uint16_t destination[8 * 4];
+	size_t i;
+
+	for (i = 0; i < sizeof(destination) / sizeof(destination[0]); i++)
+		destination[i] = 0xdead;
+
+	assert(menu_sdl2_draw_preview(destination, 8, source, 4, 2, 6,
+				      &bounds) == 0);
+	assert(destination[1 * 8 + 2] == 0x0001);
+	assert(destination[1 * 8 + 5] == 0x0004);
+	assert(destination[2 * 8 + 2] == 0x0011);
+	assert(destination[2 * 8 + 5] == 0x0014);
+	assert(destination[0 * 8 + 2] == 0xdead);
+	assert(destination[3 * 8 + 2] == 0xdead);
+	assert(destination[1 * 8 + 1] == 0xdead);
+	assert(destination[1 * 8 + 6] == 0xdead);
+}
+
+static void test_preview_rejects_invalid_geometry(void)
+{
+	uint16_t destination[8 * 4] = { 0 };
+	uint16_t source[6 * 2] = { 0 };
+	struct menu_rect bounds = { 2, 0, 4, 4 };
+	struct menu_rect empty_bounds = { 0, 0, 0, 4 };
+
+	assert(menu_sdl2_draw_preview(NULL, 8, source, 4, 2, 6,
+				      &bounds) == -1);
+	assert(menu_sdl2_draw_preview(destination, 8, NULL, 4, 2, 6,
+				      &bounds) == -1);
+	assert(menu_sdl2_draw_preview(destination, 8, source, 0, 2, 6,
+				      &bounds) == -1);
+	assert(menu_sdl2_draw_preview(destination, 8, source, 4, 0, 6,
+				      &bounds) == -1);
+	assert(menu_sdl2_draw_preview(destination, 8, source, 4, 2, 6,
+				      &empty_bounds) == -1);
+	assert(menu_sdl2_draw_preview(destination, 8, source, 4, 2, 6,
+				      NULL) == -1);
+}
+
 int main(void)
 {
 	SDL_setenv("SDL_VIDEODRIVER", "dummy", 1);
@@ -209,6 +255,8 @@ int main(void)
 	test_missing_font();
 	test_invalid_geometry_and_reinitialization();
 	test_rejects_overflowing_framebuffer_span();
+	test_preview_is_aspect_fitted_and_respects_pitch();
+	test_preview_rejects_invalid_geometry();
 
 	TTF_Quit();
 	SDL_Quit();
