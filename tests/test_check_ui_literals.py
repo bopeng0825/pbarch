@@ -67,6 +67,7 @@ class IntegrationGuardTests(unittest.TestCase):
         cls.plat_sdl_source = (ROOT / "plat_sdl.c").read_text(
             encoding="utf-8"
         )
+        cls.main_source = (ROOT / "main.c").read_text(encoding="utf-8")
 
     def test_non_sdl_build_forces_english(self):
         self.assertTrue(
@@ -112,6 +113,13 @@ class IntegrationGuardTests(unittest.TestCase):
         self.assertTrue(
             check_ui_literals.sdl_menu_capture_rebuilds_before_readback(
                 self.plat_sdl_source
+            )
+        )
+
+    def test_menu_action_captures_core_frame_before_hcge_readback(self):
+        self.assertTrue(
+            check_ui_literals.menu_action_captures_core_frame(
+                self.main_source, self.plat_sdl_source
             )
         )
 

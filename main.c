@@ -623,8 +623,11 @@ static void perform_emu_action(void) {
 }
 
 void handle_emu_action(emu_action action) {
-	if (action != EACTION_NONE)
+	if (action != EACTION_NONE) {
+		if (action == EACTION_MENU)
+			plat_video_request_menu_capture();
 		eaction = action;
+	}
 }
 
 void pa_log(enum retro_log_level level, const char *fmt, ...) {

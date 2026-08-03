@@ -39,6 +39,8 @@ static size_t screen_last_log_pitch;
 static uint16_t screen_pixels[SCREEN_WIDTH * SCREEN_HEIGHT];
 static uint16_t *hud_frame_pixels;
 static size_t hud_frame_pixels_len;
+static bool menu_capture_requested;
+static bool menu_capture_ready;
 static SDL_Surface *screen;
 
 struct sdl_video_profile {
@@ -947,7 +949,10 @@ void plat_video_menu_enter(int is_rom_loaded)
 
 #ifdef USE_SDL2
 	if (is_rom_loaded) {
-		if (!plat_sdl_menu_source_dimensions_match())
+		if (menu_capture_ready) {
+			/* Captured directly from the core callback. */
+		}
+		else if (!plat_sdl_menu_source_dimensions_match())
 			memset(g_menubg_src_ptr, 0,
 			       g_menubg_src_h * g_menubg_src_pp *
 			       sizeof(uint16_t));
@@ -994,6 +999,8 @@ void plat_video_menu_end(void)
 
 void plat_video_menu_leave(void)
 {
+	menu_capture_requested = false;
+	menu_capture_ready = false;
 	memset(g_menubg_src_ptr, 0, g_menuscreen_h * g_menuscreen_pp * sizeof(uint16_t));
 
 #ifdef USE_SDL2
@@ -1030,6 +1037,66 @@ void plat_video_set_msg(const char *new_msg, unsigned priority, unsigned msec)
 	}
 }
 
+void plat_video_request_menu_capture(void)
+{
+#ifdef USE_SDL2
+	menu_capture_requested = true;
+	menu_capture_ready = false;
+#endif
+}
+
+#ifdef USE_SDL2
+static int plat_sdl_capture_core_frame(const void *data, unsigned width,
+				       unsigned height, size_t pitch,
+				       enum retro_pixel_format format)
+{
+	const void *source = data;
+	size_t source_pitch = pitch;
+
+	if (!data || !g_menubg_src_ptr || width == 0 || height == 0)
+		return -1;
+	if (format == RETRO_PIXEL_FORMAT_XRGB8888) {
+		size_t needed = (size_t)width * height;
+		const uint8_t *src = data;
+		unsigned y;
+
+		if (pitch < (size_t)width * sizeof(uint32_t) ||
+		    needed > SIZE_MAX / sizeof(uint16_t))
+			return -1;
+		if (hud_frame_pixels_len < needed) {
+			uint16_t *new_pixels = realloc(hud_frame_pixels,
+						      needed * sizeof(uint16_t));
+			if (!new_pixels)
+				return -1;
+			hud_frame_pixels = new_pixels;
+			hud_frame_pixels_len = needed;
+		}
+		for (y = 0; y < height; y++) {
+			const uint32_t *line = (const uint32_t *)(src + (size_t)y * pitch);
+			uint16_t *dst = hud_frame_pixels + (size_t)y * width;
+			unsigned x;
+
+			for (x = 0; x < width; x++) {
+				uint32_t pixel = line[x];
+				dst[x] = (uint16_t)(((pixel >> 8) & 0xf800) |
+						    ((pixel >> 5) & 0x07e0) |
+						    ((pixel >> 3) & 0x001f));
+			}
+		}
+		source = hud_frame_pixels;
+		source_pitch = (size_t)width * sizeof(uint16_t);
+	} else if (format != RETRO_PIXEL_FORMAT_RGB565 ||
+		   pitch < (size_t)width * sizeof(uint16_t)) {
+		return -1;
+	}
+
+	memset(g_menubg_src_ptr, 0,
+	       g_menubg_src_h * g_menubg_src_pp * sizeof(uint16_t));
+	scale(width, height, source_pitch, source, g_menubg_src_ptr);
+	return 0;
+}
+#endif
+
 void plat_video_process(const void *data, unsigned width, unsigned height, size_t pitch) {
 	static int had_msg = 0;
 	frame_dirty = true;
@@ -1047,6 +1114,15 @@ void plat_video_process(const void *data, unsigned width, unsigned height, size_
 	uint16_t *pixels = screen->pixels;
 	unsigned screen_h = screen->h;
 	unsigned screen_pitch = screen->pitch / SCREEN_BPP;
+#endif
+
+#ifdef USE_SDL2
+	if (menu_capture_requested) {
+		menu_capture_ready =
+			plat_sdl_capture_core_frame(data, width, height, pitch,
+						    pixel_format) == 0;
+		menu_capture_requested = false;
+	}
 #endif
 
 	if (had_msg) {

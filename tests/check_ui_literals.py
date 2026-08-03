@@ -252,19 +252,16 @@ def sdl_menu_enter_captures_completed_frame(source: str) -> bool:
         "g_menubg_src_w == SCREEN_WIDTH",
         "g_menubg_src_h == SCREEN_HEIGHT",
         "g_menubg_src_pp == SCREEN_WIDTH",
-    )) and all(
-        re.search(pattern, body, re.DOTALL) is not None
-        for pattern in (
-            r"if\s*\(\s*is_rom_loaded\s*\)\s*\{\s*"
-            r"if\s*\(\s*!plat_sdl_menu_source_dimensions_match\s*\(\s*\)\s*\)\s*"
-            r"memset\s*\(\s*g_menubg_src_ptr\s*,\s*0\s*,.*?"
-            r"else\s+if\s*\(\s*plat_sdl_capture_menu_frame\s*\(\s*"
-            r"g_menubg_src_ptr\s*,\s*g_menubg_src_pp\s*\*\s*"
-            r"sizeof\s*\(\s*uint16_t\s*\)\s*\)\s*!=\s*0\s*\)\s*"
-            r"memcpy\s*\(\s*g_menubg_src_ptr\s*,\s*screen_pixels\s*,",
-            r"else\s*\{\s*memset\s*\(\s*g_menubg_src_ptr\s*,\s*0\s*,",
-        )
-    )
+    )) and all(token in body for token in (
+        "if (is_rom_loaded)",
+        "menu_capture_ready",
+        "plat_sdl_capture_menu_frame(g_menubg_src_ptr",
+        "memcpy(g_menubg_src_ptr, screen_pixels",
+    )) and re.search(
+        r"else\s*\{\s*memset\s*\(\s*g_menubg_src_ptr\s*,\s*0\s*,",
+        body,
+        re.DOTALL,
+    ) is not None
 
 
 def sdl_menu_capture_rebuilds_before_readback(source: str) -> bool:
@@ -290,6 +287,20 @@ def sdl_menu_capture_rebuilds_before_readback(source: str) -> bool:
         and 0 <= clear < copy < readback
         and "SDL_RenderPresent" not in body
         and "plat_sdl_capture_menu_frame(g_menubg_src_ptr" in menu_enter
+    )
+
+
+def menu_action_captures_core_frame(main_source: str, plat_source: str) -> bool:
+    action = _function_body(main_source, r"void\s+handle_emu_action\s*\([^)]*\)")
+    process = _function_body(plat_source, r"void\s+plat_video_process\s*\([^)]*\)")
+    enter = _function_body(plat_source, r"void\s+plat_video_menu_enter\s*\([^)]*\)")
+    if action is None or process is None or enter is None:
+        return False
+    return (
+        "plat_video_request_menu_capture" in action
+        and "menu_capture_requested" in process
+        and "plat_sdl_capture_core_frame" in process
+        and "menu_capture_ready" in enter
     )
 
 
