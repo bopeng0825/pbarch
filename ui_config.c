@@ -160,6 +160,16 @@ int app_args_parse(int argc, char **argv, struct app_args *out)
 			if (arg[strlen("--language=")] == '\0')
 				return -1;
 			out->language_override = arg + strlen("--language=");
+		} else if (strcmp(arg, "--key-config") == 0) {
+			if (++i >= argc || argv[i] == NULL || argv[i][0] == '\0' ||
+			    argv[i][0] == '-')
+				return -1;
+			out->key_config_path = argv[i];
+		} else if (strncmp(arg, "--key-config=",
+				   strlen("--key-config=")) == 0) {
+			if (arg[strlen("--key-config=")] == '\0')
+				return -1;
+			out->key_config_path = arg + strlen("--key-config=");
 		} else if (strcmp(arg, "--full-menu") == 0) {
 			out->full_menu = 1;
 		} else if (arg[0] == '-') {

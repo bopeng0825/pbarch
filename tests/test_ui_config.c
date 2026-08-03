@@ -32,6 +32,15 @@ int main(void)
 	char *repeated_full_menu_argv[] = {
 		"picoarch", "--full-menu", "--full-menu", "core.so"
 	};
+	char *key_cfg_argv[] = {
+		"picoarch", "--key-config", "/media/mmc/remap/gba.cfg",
+		"core.so", "game.rom"
+	};
+	char *key_cfg_equals_argv[] = {
+		"picoarch", "--key-config=/media/mmc/remap/gba.cfg", "core.so"
+	};
+	char *missing_key_cfg_argv[] = { "picoarch", "--key-config" };
+	char *empty_key_cfg_argv[] = { "picoarch", "--key-config=" };
 	char *help_argv[] = { "picoarch", "--help" };
 	char *missing_language_argv[] = { "picoarch", "--language" };
 	char *unknown_option_argv[] = { "picoarch", "--bogus" };
@@ -118,6 +127,15 @@ int main(void)
 	assert(strcmp(args.language_override, "zh-CN") == 0);
 	assert(strcmp(args.core_path, "core.so") == 0);
 	assert(args.content_path == NULL);
+
+	assert(app_args_parse(5, key_cfg_argv, &args) == 0);
+	assert(strcmp(args.key_config_path, "/media/mmc/remap/gba.cfg") == 0);
+	assert(strcmp(args.core_path, "core.so") == 0);
+	assert(strcmp(args.content_path, "game.rom") == 0);
+	assert(app_args_parse(3, key_cfg_equals_argv, &args) == 0);
+	assert(strcmp(args.key_config_path, "/media/mmc/remap/gba.cfg") == 0);
+	assert(app_args_parse(2, missing_key_cfg_argv, &args) == -1);
+	assert(app_args_parse(2, empty_key_cfg_argv, &args) == -1);
 
 	assert(app_args_parse(2, help_argv, &args) == 0);
 	assert(args.show_help);

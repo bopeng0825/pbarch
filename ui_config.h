@@ -19,6 +19,7 @@ enum ui_language_choice_status {
 
 struct app_args {
 	const char *language_override;
+	const char *key_config_path;
 	const char *core_path;
 	const char *content_path;
 	int show_help;
