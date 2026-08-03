@@ -368,6 +368,32 @@ def key_config_size_is_checked_before_allocation(source: str) -> bool:
     )
 
 
+def separated_key_config_accepts_dash_prefixed_path(source: str) -> bool:
+    parser = _function_body(source, r"int\s+app_args_parse\s*\([^)]*\)")
+    if parser is None:
+        return False
+
+    branch_match = re.search(
+        r'else\s+if\s*\(strcmp\(arg,\s*"--key-config"\)\s*==\s*0\)\s*'
+        r'\{(?P<body>.*?)\n\s*\}\s*else\s+if',
+        parser,
+        re.DOTALL,
+    )
+    if branch_match is None:
+        return False
+
+    body = branch_match.group("body")
+    sample_path = "-mapping.cfg"
+    return (
+        sample_path[0] == "-"
+        and "++i >= argc" in body
+        and "argv[i] == NULL" in body
+        and "argv[i][0] == '\\0'" in body
+        and "argv[i][0] == '-'" not in body
+        and "out->key_config_path = argv[i]" in body
+    )
+
+
 def ordinary_sdl_list_clips_text_and_rows(source: str) -> bool:
     body = _function_body(source, r"static\s+void\s+me_draw\b[^{]*")
     text_body = _function_body(source, r"void\s+text_out16\b\s*\([^)]*\)")

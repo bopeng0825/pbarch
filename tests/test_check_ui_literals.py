@@ -68,6 +68,7 @@ class IntegrationGuardTests(unittest.TestCase):
             encoding="utf-8"
         )
         cls.main_source = (ROOT / "main.c").read_text(encoding="utf-8")
+        cls.ui_config_source = (ROOT / "ui_config.c").read_text(encoding="utf-8")
 
     def test_non_sdl_build_forces_english(self):
         self.assertTrue(
@@ -142,6 +143,14 @@ class IntegrationGuardTests(unittest.TestCase):
             check_ui_literals.key_config_size_is_checked_before_allocation(
                 self.main_source
             )
+        )
+
+    def test_separated_key_config_accepts_dash_prefixed_path(self):
+        self.assertTrue(
+            check_ui_literals.separated_key_config_accepts_dash_prefixed_path(
+                self.ui_config_source
+            ),
+            "--key-config -mapping.cfg must preserve the non-empty path",
         )
 
     def test_ordinary_sdl_list_clips_long_text_and_rows(self):

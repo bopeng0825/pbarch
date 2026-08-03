@@ -161,8 +161,7 @@ int app_args_parse(int argc, char **argv, struct app_args *out)
 				return -1;
 			out->language_override = arg + strlen("--language=");
 		} else if (strcmp(arg, "--key-config") == 0) {
-			if (++i >= argc || argv[i] == NULL || argv[i][0] == '\0' ||
-			    argv[i][0] == '-')
+			if (++i >= argc || argv[i] == NULL || argv[i][0] == '\0')
 				return -1;
 			out->key_config_path = argv[i];
 		} else if (strncmp(arg, "--key-config=",
