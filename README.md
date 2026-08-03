@@ -19,6 +19,17 @@ Pass `--full-menu` to show those entries:
 ./picoarch --full-menu /path/to/core_name_libretro.so /path/to/game.gba
 ```
 
+To overlay key bindings from a picoarch-format CFG file, use either
+`--key-config PATH` or `--key-config=PATH`:
+
+```
+picoarch --key-config /media/mmc/config/remapping/gba.cfg CORE ROM
+```
+
+The file uses the same key-binding format as picoarch's saved CFG files; it is
+not compatible with FBA's `joypad.cfg` format. If it cannot be read, picoarch
+warns and continues with its normal configuration and required menu binding.
+
 ### Menu language and SDL2 skin
 
 The frontend menu defaults to English. To select a language persistently,
