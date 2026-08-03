@@ -35,9 +35,10 @@ static void test_responsive_geometry(void)
 	menu_calculate_responsive_layout(640, 480, &layout);
 	assert(layout.main_font_px == 20);
 	assert(layout.outer_margin == 20);
+	assert(layout.column_gap == layout.main_font_px);
 	assert(layout.show_preview == 1);
-	assert(layout.preview.w == 336);
-	assert(layout.preview.h == 252);
+	assert(layout.preview.w == 328);
+	assert(layout.preview.h == 246);
 
 	menu_calculate_responsive_layout(1280, 720, &layout);
 	assert(layout.main_font_px == 30);
@@ -47,6 +48,17 @@ static void test_responsive_geometry(void)
 	menu_calculate_responsive_layout(320, 240, &layout);
 	assert(layout.show_preview == 0);
 	assert(layout.preview.w == 0 && layout.preview.h == 0);
+
+	menu_calculate_responsive_layout(INT_MAX, INT_MAX, &layout);
+	assert(layout.output_width == INT_MAX);
+	assert(layout.output_height == INT_MAX);
+	assert(layout.show_preview == 1);
+	assert(layout.menu.w > 0 && layout.menu.h > 0);
+	assert(layout.preview.w > 0 && layout.preview.h > 0);
+	assert(layout.preview.x >= 0);
+	assert(layout.preview.y >= 0);
+	assert(layout.preview.x <= INT_MAX - layout.preview.w);
+	assert(layout.preview.y <= INT_MAX - layout.preview.h);
 
 	assert(menu_centered_block_y(20, 440, 148) == 166);
 	assert(menu_centered_block_y(20, 100, 120) == 20);

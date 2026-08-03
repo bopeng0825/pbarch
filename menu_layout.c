@@ -113,12 +113,12 @@ int menu_small_font_px(int main_px)
 void menu_calculate_responsive_layout(int output_width, int output_height,
 				      struct menu_responsive_layout *layout)
 {
-	int usable_width;
-	int content_height;
-	int menu_width;
-	int preview_column_width;
-	int minimum_width;
-	int preview_width;
+	int64_t usable_width;
+	int64_t content_height;
+	int64_t menu_width;
+	int64_t preview_column_width;
+	int64_t minimum_width;
+	int64_t preview_width;
 
 	if (layout == NULL)
 		return;
@@ -133,10 +133,10 @@ void menu_calculate_responsive_layout(int output_width, int output_height,
 	layout->main_font_px = menu_main_font_px(output_height);
 	layout->small_font_px = menu_small_font_px(layout->main_font_px);
 	layout->outer_margin = layout->main_font_px;
-	layout->column_gap = layout->main_font_px * 3 / 5;
+	layout->column_gap = layout->main_font_px;
 
-	usable_width = output_width - 2 * layout->outer_margin;
-	content_height = output_height - 2 * layout->outer_margin;
+	usable_width = (int64_t)output_width - 2 * layout->outer_margin;
+	content_height = (int64_t)output_height - 2 * layout->outer_margin;
 	if (usable_width < 0)
 		usable_width = 0;
 	if (content_height < 0)
@@ -145,29 +145,29 @@ void menu_calculate_responsive_layout(int output_width, int output_height,
 	preview_column_width = usable_width - layout->column_gap - menu_width;
 	if (preview_column_width < 0)
 		preview_column_width = 0;
-	minimum_width = 12 * layout->main_font_px;
+	minimum_width = (int64_t)12 * layout->main_font_px;
 	layout->show_preview = menu_width >= minimum_width &&
 		preview_column_width >= minimum_width;
 
 	layout->menu.x = layout->outer_margin;
 	layout->menu.y = layout->outer_margin;
-	layout->menu.w = layout->show_preview ? menu_width : usable_width;
-	layout->menu.h = content_height;
+	layout->menu.w = (int)(layout->show_preview ? menu_width : usable_width);
+	layout->menu.h = (int)content_height;
 	if (!layout->show_preview)
 		return;
 
-	preview_width = output_height * 7 / 10;
+	preview_width = (int64_t)output_height * 7 / 10;
 	if (preview_width > preview_column_width)
 		preview_width = preview_column_width;
 	if (preview_width > content_height * 4 / 3)
 		preview_width = content_height * 4 / 3;
 	preview_width &= ~3;
-	layout->preview.w = preview_width;
-	layout->preview.h = preview_width * 3 / 4;
-	layout->preview.x = layout->outer_margin + menu_width +
-		layout->column_gap + (preview_column_width - preview_width) / 2;
-	layout->preview.y = layout->outer_margin +
-		(content_height - layout->preview.h) / 2;
+	layout->preview.w = (int)preview_width;
+	layout->preview.h = (int)(preview_width * 3 / 4);
+	layout->preview.x = (int)(layout->outer_margin + menu_width +
+		layout->column_gap + (preview_column_width - preview_width) / 2);
+	layout->preview.y = (int)(layout->outer_margin +
+		(content_height - layout->preview.h) / 2);
 }
 
 int menu_centered_block_y(int top, int height, int block_height)
