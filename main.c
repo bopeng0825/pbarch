@@ -453,6 +453,7 @@ void load_config_keys(const char *key_config_path)
 {
 	char *config = NULL;
 	int kcount = 0;
+	const int *binds = NULL;
 	const int *defbinds = NULL;
 
 	alloc_config_buffer(&config);
@@ -466,10 +467,14 @@ void load_config_keys(const char *key_config_path)
 
 	/* Force input device 0 menu to be bound to the default key */
 	in_get_config(0, IN_CFG_BIND_COUNT, &kcount);
+	binds = in_get_dev_binds(0);
 	defbinds = in_get_dev_def_binds(0);
 
 	for(int i = 0; i < kcount; i++) {
-		if (defbinds[IN_BIND_OFFS(i, IN_BINDTYPE_EMU)] == 1 << EACTION_MENU) {
+		if (binds != NULL && defbinds != NULL &&
+		    defbinds[IN_BIND_OFFS(i, IN_BINDTYPE_EMU)] == 1 << EACTION_MENU &&
+		    !(binds[IN_BIND_OFFS(i, IN_BINDTYPE_EMU)] &
+		      (1 << EACTION_MENU))) {
 			in_bind_key(0, i, 1 << EACTION_MENU, IN_BINDTYPE_EMU, 0);
 		}
 #ifdef FUNKEY_S

@@ -368,6 +368,19 @@ def key_config_size_is_checked_before_allocation(source: str) -> bool:
     )
 
 
+def menu_key_protection_is_idempotent(source: str) -> bool:
+    loader = _function_body(
+        source, r"void\s+load_config_keys\s*\(\s*const\s+char\s*\*\s*key_config_path\s*\)"
+    )
+    if loader is None:
+        return False
+
+    get_binds = loader.find("in_get_dev_binds(0)")
+    bound_check = loader.find("!(binds[IN_BIND_OFFS(i, IN_BINDTYPE_EMU)] &")
+    toggle = loader.find("in_bind_key(0, i, 1 << EACTION_MENU")
+    return 0 <= get_binds < bound_check < toggle
+
+
 def separated_key_config_accepts_dash_prefixed_path(source: str) -> bool:
     parser = _function_body(source, r"int\s+app_args_parse\s*\([^)]*\)")
     if parser is None:

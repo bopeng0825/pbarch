@@ -145,6 +145,14 @@ class IntegrationGuardTests(unittest.TestCase):
             )
         )
 
+    def test_menu_key_protection_does_not_toggle_an_existing_binding(self):
+        self.assertTrue(
+            check_ui_literals.menu_key_protection_is_idempotent(
+                self.main_source
+            ),
+            "MENU protection must only bind when the default key is unbound",
+        )
+
     def test_separated_key_config_accepts_dash_prefixed_path(self):
         self.assertTrue(
             check_ui_literals.separated_key_config_accepts_dash_prefixed_path(
