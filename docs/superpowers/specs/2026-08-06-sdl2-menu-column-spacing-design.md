@@ -4,7 +4,7 @@
 
 Reduce the excessive-looking horizontal whitespace between the left menu text
 and the right game preview in SDL2 list menus. Preserve the existing text
-origin, preview dimensions, vertical placement, font sizes, and line spacing.
+origin, preview sizing rules, vertical centering, font sizes, and line spacing.
 The layout must remain suitable for both 640x480 and 1280x720 output.
 
 ## Layout change
@@ -21,14 +21,15 @@ All other responsive rules remain unchanged:
   available preview column and the height available for a 4:3 frame;
 - preview width remains rounded down to a multiple of four;
 - the preview remains vertically centered;
-- two-column mode still requires both columns to be at least twelve main-font
+- two-column mode requires both columns to be at least eleven main-font
   widths wide, otherwise the preview is hidden and the menu uses the full
   width.
 
 ## Expected geometry
 
-At 640x480, the main font remains 20 pixels and the preview remains 328x246.
-Its horizontal origin moves from x=292 to x=268.
+At 640x480, the main font remains 20 pixels. The wider preview column allows
+the existing sizing rule to increase the preview from 328x246 to 336x252. Its
+origin moves from x=292, y=117 to x=268, y=114.
 
 At 1280x720, the main font remains 30 pixels and the preview remains 504x378.
 Its horizontal origin moves from x=629 to x=523.
@@ -40,7 +41,7 @@ right of the preview instead of being split on both sides of it.
 ## Scope
 
 Only the pure responsive geometry in `menu_layout.c` changes. Menu rendering,
-font metrics, vertical item spacing, preview scaling and aspect fitting,
+font metrics, vertical item spacing, preview sizing rules and aspect fitting,
 input, and non-SDL2 presentation are outside this change.
 
 ## Validation

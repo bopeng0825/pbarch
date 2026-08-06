@@ -141,11 +141,11 @@ void menu_calculate_responsive_layout(int output_width, int output_height,
 		usable_width = 0;
 	if (content_height < 0)
 		content_height = 0;
-	menu_width = usable_width * 42 / 100;
+	menu_width = usable_width * 38 / 100;
 	preview_column_width = usable_width - layout->column_gap - menu_width;
 	if (preview_column_width < 0)
 		preview_column_width = 0;
-	minimum_width = (int64_t)12 * layout->main_font_px;
+	minimum_width = (int64_t)11 * layout->main_font_px;
 	layout->show_preview = menu_width >= minimum_width &&
 		preview_column_width >= minimum_width;
 
@@ -165,7 +165,7 @@ void menu_calculate_responsive_layout(int output_width, int output_height,
 	layout->preview.w = (int)preview_width;
 	layout->preview.h = (int)(preview_width * 3 / 4);
 	layout->preview.x = (int)(layout->outer_margin + menu_width +
-		layout->column_gap + (preview_column_width - preview_width) / 2);
+		layout->column_gap);
 	layout->preview.y = (int)(layout->outer_margin +
 		(content_height - layout->preview.h) / 2);
 }

@@ -37,11 +37,17 @@ static void test_responsive_geometry(void)
 	assert(layout.outer_margin == 20);
 	assert(layout.column_gap == layout.main_font_px);
 	assert(layout.show_preview == 1);
-	assert(layout.preview.w == 328);
-	assert(layout.preview.h == 246);
+	assert(layout.menu.w == 228);
+	assert(layout.preview.x == 268);
+	assert(layout.preview.y == 114);
+	assert(layout.preview.w == 336);
+	assert(layout.preview.h == 252);
 
 	menu_calculate_responsive_layout(1280, 720, &layout);
 	assert(layout.main_font_px == 30);
+	assert(layout.menu.w == 463);
+	assert(layout.preview.x == 523);
+	assert(layout.preview.y == 171);
 	assert(layout.preview.w == 504);
 	assert(layout.preview.h == 378);
 
