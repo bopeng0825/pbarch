@@ -54,6 +54,20 @@ class H150102PlatformTest(unittest.TestCase):
             r"#define SCREEN_HEIGHT 720",
         )
 
+    def test_sdl_runtime_behavior_is_shared_with_h150101(self):
+        plat_sdl = (ROOT / "plat_sdl.c").read_text(encoding="utf-8")
+        shared_guard = r"#if defined\(H150101\) \|\| defined\(H150102\)"
+
+        for behavior in (
+            r'if \(!getenv\("SDL_VIDEODRIVER"\)\)',
+            r"if \(screen_renderer_vsync &&",
+            r"SDL_WINDOW_SHOWN \| SDL_WINDOW_FULLSCREEN_DESKTOP",
+        ):
+            self.assertRegex(
+                plat_sdl,
+                shared_guard + r"(?:(?!#endif)[\s\S])*?" + behavior,
+            )
+
 
 if __name__ == "__main__":
     unittest.main()
