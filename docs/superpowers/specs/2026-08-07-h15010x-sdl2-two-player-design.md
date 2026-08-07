@@ -22,7 +22,7 @@
 
 H150101 SDL2 驱动只尝试注册 joystick index 0 和 index 1。每个驱动状态记录固定玩家：index 0 是玩家 1，index 1 是玩家 2。设备更新时，玩家 1 把默认游戏按键写入 `IN_BINDTYPE_PLAYER12`，玩家 2 把同一套游戏按键写入 `IN_BINDTYPE_PLAYER2`。模拟器动作仍写入 `IN_BINDTYPE_EMU`，因此两个手柄都可触发菜单。
 
-注册名称包含稳定的玩家序号，例如 `h150101-sdl2:p1:<name>` 和 `h150101-sdl2:p2:<name>`。这可以防止两个同型号 USB 手柄因名称相同而被通用输入注册层合并为一个设备。
+玩家 1 保留原有注册名称 `h150101-sdl2:<name>`，避免已有单手柄按键配置失效；玩家 2 使用 `h150101-sdl2:p2:<name>`。这可以防止两个同型号 USB 手柄因名称相同而被通用输入注册层合并为一个设备。
 
 `core.c` 将单个按键掩码改为两个元素：玩家 1 读取 `IN_BINDTYPE_PLAYER12`，玩家 2 读取 `IN_BINDTYPE_PLAYER2`。`pa_input_state()` 接受 joypad 的 port 0 和 port 1，并返回相应掩码；其他 port、device 和 index 仍返回 0。
 
@@ -33,6 +33,7 @@ H150101 SDL2 驱动只尝试注册 joystick index 0 和 index 1。每个驱动�
 3. 每帧 `in_update()` 调用两个设备的更新函数。
 4. P1 和 P2 的游戏按键分别累计到两个绑定类型，模拟器动作共同累计到 EMU 类型。
 5. 核心输入回调按照 Libretro port 返回相互隔离的玩家状态。
+6. 驱动轮询某个设备时会暂存并重新入队属于另一设备的 SDL2 事件，确保游戏和菜单轮询都不会吞掉另一玩家的输入。
 
 ## 错误和边界处理
 

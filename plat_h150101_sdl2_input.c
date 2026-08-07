@@ -15,6 +15,8 @@ struct h150101_sdl2_state {
 	SDL_Joystick *joy;
 	SDL_JoystickID joy_id;
 	int joy_index;
+	int player;
+	int quit_count;
 	uint8_t keys[H150101_SDL2_KEY_COUNT];
 	void (*event_handler)(void *event);
 };
@@ -174,8 +176,13 @@ static void poll_events(struct h150101_sdl2_state *state)
 	SDL_PumpEvents();
 
 	while (count++ < 32 && SDL_PollEvent(&event)) {
-		if (is_joy_event(event.type))
-			handle_event(state, &event);
+		if (is_joy_event(event.type)) {
+			if (!handle_event(state, &event) &&
+			    event.type != SDL_JOYDEVICEADDED &&
+			    event.type != SDL_JOYDEVICEREMOVED &&
+			    skipped_count < (int)(sizeof(skipped) / sizeof(skipped[0])))
+				skipped[skipped_count++] = event;
+		}
 		else {
 			if (state->event_handler)
 				state->event_handler(&event);
@@ -216,6 +223,8 @@ static void h150101_sdl2_probe(const in_drv_t *drv)
 
 	SDL_JoystickEventState(SDL_ENABLE);
 	joycount = SDL_NumJoysticks();
+	if (joycount > 2)
+		joycount = 2;
 
 	for (i = 0; i < joycount; i++) {
 		joy = SDL_JoystickOpen(i);
@@ -233,13 +242,19 @@ static void h150101_sdl2_probe(const in_drv_t *drv)
 		state->pdata = pdata->pdata;
 		state->joy = joy;
 		state->joy_index = i;
+		state->player = i;
 		state->joy_id = SDL_JoystickInstanceID(joy);
 		state->event_handler = pdata->handler;
 
 		joy_name = SDL_JoystickNameForIndex(i);
 		if (!joy_name)
 			joy_name = "joystick";
-		snprintf(name, sizeof(name), IN_H150101_SDL2_PREFIX "%s", joy_name);
+		if (state->player == 0)
+			snprintf(name, sizeof(name), IN_H150101_SDL2_PREFIX "%s",
+				joy_name);
+		else
+			snprintf(name, sizeof(name), IN_H150101_SDL2_PREFIX "p2:%s",
+				joy_name);
 		in_register(name, -1, state, H150101_SDL2_KEY_COUNT,
 			h150101_sdl2_key_names, 0);
 	}
@@ -266,7 +281,6 @@ static const char * const *h150101_sdl2_get_key_names(const in_drv_t *drv, int *
 static int h150101_sdl2_update(void *drv_data, const int *binds, int *result)
 {
 	struct h150101_sdl2_state *state = drv_data;
-	static int quit_count = 0;
 	int i, b;
 
 	poll_events(state);
@@ -279,14 +293,14 @@ static int h150101_sdl2_update(void *drv_data, const int *binds, int *result)
 	if (state->keys[H150101_SDL2_BUTTON(8)] &&
 	    state->keys[H150101_SDL2_BUTTON(9)]) {
 
-		quit_count++;
+		state->quit_count++;
 
 		// 约0.5秒
-		if (quit_count > 30)
+		if (state->quit_count > 30)
 			result[IN_BINDTYPE_EMU] |= 1 << EACTION_QUIT;
 
 	} else {
-		quit_count = 0;
+		state->quit_count = 0;
 	}
 
 
@@ -302,6 +316,13 @@ static int h150101_sdl2_update(void *drv_data, const int *binds, int *result)
 			    b == IN_BINDTYPE_EMU)
 				continue;
 
+			if (state->player == 1 &&
+			    b == IN_BINDTYPE_PLAYER12) {
+				result[IN_BINDTYPE_PLAYER2] |=
+					binds[IN_BIND_OFFS(i, b)];
+				continue;
+			}
+
 			result[b] |= binds[IN_BIND_OFFS(i, b)];
 		}
 	}
@@ -313,6 +334,8 @@ static int h150101_sdl2_update_keycode(void *drv_data, int *is_down)
 {
 	struct h150101_sdl2_state *state = drv_data;
 	SDL_Event event;
+	SDL_Event skipped[16];
+	int i, skipped_count = 0;
 	int key = -1;
 
 	SDL_PumpEvents();
@@ -323,21 +346,26 @@ static int h150101_sdl2_update_keycode(void *drv_data, int *is_down)
 				state->event_handler(&event);
 			continue;
 		}
+		if (!event_matches_joy(state, &event)) {
+			if (event.type != SDL_JOYDEVICEADDED &&
+			    event.type != SDL_JOYDEVICEREMOVED &&
+			    skipped_count < (int)(sizeof(skipped) / sizeof(skipped[0])))
+				skipped[skipped_count++] = event;
+			continue;
+		}
 
 		switch (event.type) {
 		case SDL_JOYBUTTONDOWN:
 		case SDL_JOYBUTTONUP:
-			if (!event_matches_joy(state, &event) ||
-			    event.jbutton.button >= H150101_SDL2_BUTTON_COUNT)
+			if (event.jbutton.button >= H150101_SDL2_BUTTON_COUNT)
 				continue;
 			key = H150101_SDL2_BUTTON(event.jbutton.button);
 			if (is_down)
 				*is_down = event.jbutton.state == SDL_PRESSED;
 			set_key(state, key, is_down ? *is_down : event.jbutton.state == SDL_PRESSED);
-			return key;
+			goto finish;
 		case SDL_JOYAXISMOTION:
-			if (!event_matches_joy(state, &event) ||
-			    event.jaxis.axis >= H150101_SDL2_AXIS_COUNT)
+			if (event.jaxis.axis >= H150101_SDL2_AXIS_COUNT)
 				continue;
 			{
 				int neg = H150101_SDL2_AXIS_NEG(event.jaxis.axis);
@@ -349,12 +377,14 @@ static int h150101_sdl2_update_keycode(void *drv_data, int *is_down)
 				if (state->keys[neg] != old_neg) {
 					if (is_down)
 						*is_down = state->keys[neg];
-					return neg;
+					key = neg;
+					goto finish;
 				}
 				if (state->keys[pos] != old_pos) {
 					if (is_down)
 						*is_down = state->keys[pos];
-					return pos;
+					key = pos;
+					goto finish;
 				}
 			}
 			continue;
@@ -363,7 +393,10 @@ static int h150101_sdl2_update_keycode(void *drv_data, int *is_down)
 		}
 	}
 
-	return -1;
+finish:
+	for (i = 0; i < skipped_count; i++)
+		SDL_PushEvent(&skipped[i]);
+	return key;
 }
 
 static int h150101_sdl2_menu_translate(void *drv_data, int keycode, char *charcode)

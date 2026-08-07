@@ -37,7 +37,7 @@ static char save_dir[MAX_PATH];
 static char system_dir[MAX_PATH];
 static struct retro_disk_control_ext_callback disk_control_ext;
 
-static uint32_t buttons = 0;
+static uint32_t buttons[2] = { 0, };
 static int polled = 0;
 
 struct core_cb_profile {
@@ -810,7 +810,8 @@ static void pa_input_poll(void) {
 	}
 	handle_emu_action(which);
 
-	buttons = actions[IN_BINDTYPE_PLAYER12];
+	buttons[0] = actions[IN_BINDTYPE_PLAYER12];
+	buttons[1] = actions[IN_BINDTYPE_PLAYER2];
 	polled = 1;
 	if (profiling) {
 		core_frame_input_poll_us += core_profile_ticks_us() - start_us;
@@ -823,16 +824,16 @@ static int16_t pa_input_state(unsigned port, unsigned device, unsigned index, un
 	uint64_t start_us;
 	int16_t ret = 0;
 
-	if (port == 0 && device == RETRO_DEVICE_JOYPAD && index == 0 && !polled)
+	if (port < 2 && device == RETRO_DEVICE_JOYPAD && index == 0 && !polled)
 		pa_input_poll();
 
 	if (profiling)
 		start_us = core_profile_ticks_us();
-	if (port == 0 && device == RETRO_DEVICE_JOYPAD && index == 0) {
+	if (port < 2 && device == RETRO_DEVICE_JOYPAD && index == 0) {
 		if (id == RETRO_DEVICE_ID_JOYPAD_MASK)
-			ret = buttons;
+			ret = buttons[port];
 		else
-			ret = (buttons >> id) & 1;
+			ret = (buttons[port] >> id) & 1;
 	}
 
 	if (profiling) {
