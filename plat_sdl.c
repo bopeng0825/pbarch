@@ -120,7 +120,7 @@ static void plat_sdl_log_video_drivers(void)
 
 static void plat_sdl_set_platform_defaults(void)
 {
-#ifdef H150101
+#if defined(H150101) || defined(H150102)
 	if (!getenv("SDL_VIDEODRIVER"))
 		setenv("SDL_VIDEODRIVER", "fb_hcge", 0);
 	if (!getenv("SDL_RENDER_DRIVER"))
@@ -482,7 +482,7 @@ static void plat_sdl_log_renderer_info(void)
 		(info.flags & SDL_RENDERER_SOFTWARE) ? " software" : "",
 		(info.flags & SDL_RENDERER_PRESENTVSYNC) ? " vsync" : "");
 	screen_renderer_vsync = !!(info.flags & SDL_RENDERER_PRESENTVSYNC);
-#ifdef H150101
+#if defined(H150101) || defined(H150102)
 	if (screen_renderer_vsync && !getenv("PICOARCH_TRUST_RENDERER_VSYNC")) {
 		PA_INFO("H150101: ignoring renderer vsync flag; using manual frame pacing\n");
 		screen_renderer_vsync = false;
@@ -515,7 +515,7 @@ static int plat_sdl_create_window(void)
 	                          SDL_WINDOWPOS_CENTERED,
 	                          SCREEN_WIDTH,
 	                          SCREEN_HEIGHT,
-#ifdef H150101
+#if defined(H150101) || defined(H150102)
 	                          SDL_WINDOW_SHOWN | SDL_WINDOW_FULLSCREEN_DESKTOP);
 #else
 	                          SDL_WINDOW_SHOWN);

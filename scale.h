@@ -7,6 +7,9 @@
 #elif defined(H150101)
 #define SCREEN_WIDTH 640
 #define SCREEN_HEIGHT 480
+#elif defined(H150102)
+#define SCREEN_WIDTH 1280
+#define SCREEN_HEIGHT 720
 #else
 #define SCREEN_WIDTH 320
 #define SCREEN_HEIGHT 240
