@@ -135,6 +135,19 @@ enum ui_language_choice_status ui_language_resolve(
 	return UI_LANGUAGE_CHOICE_OK;
 }
 
+static int app_scale_mode_parse(const char *value,
+				enum app_scale_mode *mode)
+{
+	if (strcmp(value, "scaled") == 0)
+		*mode = APP_SCALE_SCALED;
+	else if (strcmp(value, "stretched") == 0)
+		*mode = APP_SCALE_STRETCHED;
+	else
+		return -1;
+
+	return 0;
+}
+
 int app_args_parse(int argc, char **argv, struct app_args *out)
 {
 	int positional_count = 0;
@@ -171,6 +184,16 @@ int app_args_parse(int argc, char **argv, struct app_args *out)
 			out->key_config_path = arg + strlen("--key-config=");
 		} else if (strcmp(arg, "--full-menu") == 0) {
 			out->full_menu = 1;
+		} else if (strcmp(arg, "--scale") == 0) {
+			if (++i >= argc || argv[i] == NULL || argv[i][0] == '\0' ||
+			    app_scale_mode_parse(argv[i], &out->scale_mode) != 0)
+				return -1;
+		} else if (strncmp(arg, "--scale=", strlen("--scale=")) == 0) {
+			const char *value = arg + strlen("--scale=");
+
+			if (value[0] == '\0' ||
+			    app_scale_mode_parse(value, &out->scale_mode) != 0)
+				return -1;
 		} else if (arg[0] == '-') {
 			return -1;
 		} else if (positional_count == 0) {

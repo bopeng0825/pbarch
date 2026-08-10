@@ -17,11 +17,17 @@ enum ui_language_choice_status {
 	UI_LANGUAGE_CHOICE_WARN_LANGUAGE
 };
 
+enum app_scale_mode {
+	APP_SCALE_SCALED = 0,
+	APP_SCALE_STRETCHED,
+};
+
 struct app_args {
 	const char *language_override;
 	const char *key_config_path;
 	const char *core_path;
 	const char *content_path;
+	enum app_scale_mode scale_mode;
 	int show_help;
 	int full_menu;
 };
