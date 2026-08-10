@@ -324,6 +324,22 @@ def key_config_overlay_is_last_before_menu_protection(
     )
 
 
+def scale_override_follows_loaded_config(source: str) -> bool:
+    main = _function_body(source, r"int\s+main\s*\([^)]*\)")
+    if main is None:
+        return False
+
+    defaults = main.find("set_defaults()")
+    config = main.find("load_config()")
+    override = main.find("args.scale_mode == APP_SCALE_STRETCHED")
+    core_load = main.find("core_load()")
+    return (
+        0 <= defaults < config < override < core_load
+        and "SCALE_SIZE_STRETCHED" in main[override:core_load]
+        and "SCALE_SIZE_SCALED" in main[override:core_load]
+    )
+
+
 def key_config_open_failure_preserves_normal_keys(source: str) -> bool:
     helper = _function_body(
         source,
