@@ -50,6 +50,19 @@ int main(void)
 	char *too_many_argv[] = {
 		"picoarch", "core.so", "game.rom", "extra"
 	};
+	char *scale_scaled_argv[] = {
+		"picoarch", "core.so", "game.rom", "--scale", "scaled"
+	};
+	char *scale_stretched_argv[] = {
+		"picoarch", "--scale=stretched", "core.so", "game.rom"
+	};
+	char *repeated_scale_argv[] = {
+		"picoarch", "--scale", "stretched", "--scale=scaled", "core.so"
+	};
+	char *missing_scale_argv[] = { "picoarch", "--scale" };
+	char *empty_scale_argv[] = { "picoarch", "--scale=" };
+	char *invalid_scale_argv[] = { "picoarch", "--scale", "native" };
+	char *default_scale_argv[] = { "picoarch" };
 	FILE *config_file;
 
 	assert(ui_config_parse("language = zh_CN\n", language,
@@ -148,5 +161,26 @@ int main(void)
 	assert(app_args_parse(2, missing_language_argv, &args) == -1);
 	assert(app_args_parse(2, unknown_option_argv, &args) == -1);
 	assert(app_args_parse(4, too_many_argv, &args) == -1);
+
+	assert(app_args_parse(1, default_scale_argv, &args) == 0);
+	assert(args.scale_mode == APP_SCALE_SCALED);
+
+	assert(app_args_parse(5, scale_scaled_argv, &args) == 0);
+	assert(args.scale_mode == APP_SCALE_SCALED);
+	assert(strcmp(args.core_path, "core.so") == 0);
+	assert(strcmp(args.content_path, "game.rom") == 0);
+
+	assert(app_args_parse(4, scale_stretched_argv, &args) == 0);
+	assert(args.scale_mode == APP_SCALE_STRETCHED);
+	assert(strcmp(args.core_path, "core.so") == 0);
+	assert(strcmp(args.content_path, "game.rom") == 0);
+
+	assert(app_args_parse(6, repeated_scale_argv, &args) == 0);
+	assert(args.scale_mode == APP_SCALE_SCALED);
+	assert(strcmp(args.core_path, "core.so") == 0);
+
+	assert(app_args_parse(2, missing_scale_argv, &args) == -1);
+	assert(app_args_parse(2, empty_scale_argv, &args) == -1);
+	assert(app_args_parse(3, invalid_scale_argv, &args) == -1);
 	return 0;
 }

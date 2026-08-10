@@ -819,12 +819,16 @@ int main(int argc, char **argv) {
 	install_signal_handlers();
 
 	if (app_args_parse(argc, argv, &args) != 0) {
-		printf("Usage: picoarch [--full-menu] [--language CODE] [libretro_core [content]] [--key-config PATH]\n");
+		printf("Usage: picoarch [--full-menu] [--language CODE] [libretro_core [content]] "
+		       "[--key-config PATH] "
+		       "[--scale scaled|stretched]\n");
 		return 1;
 	}
 	menu_set_full_menu(args.full_menu);
 	if (args.show_help) {
-		printf("Usage: picoarch [--full-menu] [--language CODE] [libretro_core [content]] [--key-config PATH]\n");
+		printf("Usage: picoarch [--full-menu] [--language CODE] [libretro_core [content]] "
+		       "[--key-config PATH] "
+		       "[--scale scaled|stretched]\n");
 		return 0;
 	}
 
@@ -905,6 +909,9 @@ int main(int argc, char **argv) {
 	if (core_load_content(content)) {
 		quit(-1);
 	}
+
+	scale_size = args.scale_mode == APP_SCALE_STRETCHED ?
+		SCALE_SIZE_STRETCHED : SCALE_SIZE_SCALED;
 
 	core_save_last_opened(content);
 

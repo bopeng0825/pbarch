@@ -131,6 +131,13 @@ class IntegrationGuardTests(unittest.TestCase):
             )
         )
 
+    def test_scale_override_follows_core_content_load(self):
+        self.assertTrue(
+            check_ui_literals.scale_override_follows_loaded_config(
+                self.main_source
+            )
+        )
+
     def test_key_config_open_failure_preserves_normal_keys(self):
         self.assertTrue(
             check_ui_literals.key_config_open_failure_preserves_normal_keys(
