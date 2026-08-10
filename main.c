@@ -892,8 +892,6 @@ int main(int argc, char **argv) {
 
 	set_defaults();
 	load_config();
-	scale_size = args.scale_mode == APP_SCALE_STRETCHED ?
-		SCALE_SIZE_STRETCHED : SCALE_SIZE_SCALED;
 	core_load();
 
 #ifdef FUNKEY_S
@@ -911,6 +909,9 @@ int main(int argc, char **argv) {
 	if (core_load_content(content)) {
 		quit(-1);
 	}
+
+	scale_size = args.scale_mode == APP_SCALE_STRETCHED ?
+		SCALE_SIZE_STRETCHED : SCALE_SIZE_SCALED;
 
 	core_save_last_opened(content);
 

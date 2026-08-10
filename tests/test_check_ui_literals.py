@@ -131,7 +131,7 @@ class IntegrationGuardTests(unittest.TestCase):
             )
         )
 
-    def test_scale_override_follows_loaded_config(self):
+    def test_scale_override_follows_core_content_load(self):
         self.assertTrue(
             check_ui_literals.scale_override_follows_loaded_config(
                 self.main_source
