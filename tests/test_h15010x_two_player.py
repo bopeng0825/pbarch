@@ -68,6 +68,32 @@ class H15010xTwoPlayerTest(unittest.TestCase):
         self.assertIn("skipped[skipped_count++] = event", update_keycode)
         self.assertIn("SDL_PushEvent(&skipped[i])", update_keycode)
 
+    def test_select_start_opens_menu_once_and_never_quits(self):
+        source = (ROOT / "plat_h150101_sdl2_input.c").read_text(
+            encoding="utf-8"
+        )
+        state = source[
+            source.index("struct h150101_sdl2_state"):
+            source.index("struct h150101_sdl2_pdata")
+        ]
+        update = source[
+            source.index("static int h150101_sdl2_update("):
+            source.index("static int h150101_sdl2_update_keycode")
+        ]
+
+        self.assertIn("int menu_combo_latched;", state)
+        self.assertRegex(
+            update,
+            r"state->keys\[H150101_SDL2_BUTTON\(8\)\]\s*&&\s*"
+            r"state->keys\[H150101_SDL2_BUTTON\(9\)\]",
+        )
+        self.assertIn("!state->menu_combo_latched", update)
+        self.assertIn("1 << EACTION_MENU", update)
+        self.assertIn("state->menu_combo_latched = 1", update)
+        self.assertIn("state->menu_combo_latched = 0", update)
+        self.assertNotIn("quit_count", source)
+        self.assertNotIn("EACTION_QUIT", update)
+
     def test_core_routes_joypad_queries_by_libretro_port(self):
         source = (ROOT / "core.c").read_text(encoding="utf-8")
 

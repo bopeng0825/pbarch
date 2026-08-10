@@ -16,7 +16,7 @@ struct h150101_sdl2_state {
 	SDL_JoystickID joy_id;
 	int joy_index;
 	int player;
-	int quit_count;
+	int menu_combo_latched;
 	uint8_t keys[H150101_SDL2_KEY_COUNT];
 	void (*event_handler)(void *event);
 };
@@ -292,15 +292,13 @@ static int h150101_sdl2_update(void *drv_data, const int *binds, int *result)
 
 	if (state->keys[H150101_SDL2_BUTTON(8)] &&
 	    state->keys[H150101_SDL2_BUTTON(9)]) {
-
-		state->quit_count++;
-
-		// 约0.5秒
-		if (state->quit_count > 30)
-			result[IN_BINDTYPE_EMU] |= 1 << EACTION_QUIT;
-
-	} else {
-		state->quit_count = 0;
+		if (!state->menu_combo_latched) {
+			result[IN_BINDTYPE_EMU] |= 1 << EACTION_MENU;
+			state->menu_combo_latched = 1;
+		}
+	}
+	else {
+		state->menu_combo_latched = 0;
 	}
 
 
