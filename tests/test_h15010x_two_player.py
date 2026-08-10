@@ -68,6 +68,22 @@ class H15010xTwoPlayerTest(unittest.TestCase):
         self.assertIn("skipped[skipped_count++] = event", update_keycode)
         self.assertIn("SDL_PushEvent(&skipped[i])", update_keycode)
 
+    def test_sdl_hat_directions_are_available_to_the_menu(self):
+        driver = (ROOT / "plat_h150101_sdl2_input.c").read_text(
+            encoding="utf-8"
+        )
+        platform = (ROOT / "plat_h150101.c").read_text(encoding="utf-8")
+        update_keycode = driver[
+            driver.index("static int h150101_sdl2_update_keycode"):
+            driver.index("static int h150101_sdl2_menu_translate")
+        ]
+
+        self.assertIn("case SDL_JOYHATMOTION:", update_keycode)
+        self.assertIn("H150101_SDL2_AXIS_NEG(0),  PBTN_LEFT", platform)
+        self.assertIn("H150101_SDL2_AXIS_POS(0),  PBTN_RIGHT", platform)
+        self.assertIn("H150101_SDL2_AXIS_NEG(1),  PBTN_UP", platform)
+        self.assertIn("H150101_SDL2_AXIS_POS(1),  PBTN_DOWN", platform)
+
     def test_select_start_opens_menu_once_and_never_quits(self):
         source = (ROOT / "plat_h150101_sdl2_input.c").read_text(
             encoding="utf-8"

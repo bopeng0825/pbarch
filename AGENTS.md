@@ -34,3 +34,5 @@ Recent commits use short, imperative or descriptive subjects such as `sdl2 input
 ## Agent-Specific Instructions
 
 Avoid broad refactors in hot paths such as video, input, scaling, and core callbacks unless the request requires them. Do not edit submodule code casually; prefer patches under `patches/<core>/` for downstream core changes.
+
+设计文档用英文

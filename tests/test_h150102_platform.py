@@ -50,8 +50,8 @@ class H150102PlatformTest(unittest.TestCase):
         self.assertRegex(
             scale_h,
             r"#elif defined\(H150102\)\s+"
-            r"#define SCREEN_WIDTH 1280\s+"
-            r"#define SCREEN_HEIGHT 720",
+            r"#define SCREEN_WIDTH 640\s+"
+            r"#define SCREEN_HEIGHT 360",
         )
 
     def test_sdl_runtime_behavior_is_shared_with_h150101(self):
@@ -67,6 +67,14 @@ class H150102PlatformTest(unittest.TestCase):
                 plat_sdl,
                 shared_guard + r"(?:(?!#endif)[\s\S])*?" + behavior,
             )
+
+    def test_menu_background_uses_height_times_pitch(self):
+        menu = (ROOT / "menu.c").read_text(encoding="utf-8")
+
+        self.assertIn(
+            "calloc(g_menuscreen_h * g_menuscreen_pp, sizeof(uint16_t))",
+            menu,
+        )
 
 
 if __name__ == "__main__":

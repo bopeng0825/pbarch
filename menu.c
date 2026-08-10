@@ -1075,7 +1075,7 @@ int menu_init(void)
 	menu_init_base();
 
 	g_menubg_src_ptr = calloc(g_menubg_src_pp * g_menubg_src_h, sizeof(uint16_t));
-	g_menubg_ptr = calloc(g_menuscreen_w * g_menuscreen_pp, sizeof(uint16_t));
+	g_menubg_ptr = calloc(g_menuscreen_h * g_menuscreen_pp, sizeof(uint16_t));
 	if (g_menubg_src_ptr == NULL || g_menubg_ptr == NULL) {
 		fprintf(stderr, "OOM\n");
 		return -1;

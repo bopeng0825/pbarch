@@ -386,6 +386,29 @@ static int h150101_sdl2_update_keycode(void *drv_data, int *is_down)
 				}
 			}
 			continue;
+		case SDL_JOYHATMOTION:
+			{
+				int hat_keys[] = {
+					H150101_SDL2_AXIS_NEG(0),
+					H150101_SDL2_AXIS_POS(0),
+					H150101_SDL2_AXIS_NEG(1),
+					H150101_SDL2_AXIS_POS(1),
+				};
+				uint8_t old_keys[4];
+
+				for (i = 0; i < 4; i++)
+					old_keys[i] = state->keys[hat_keys[i]];
+				handle_hat(state, event.jhat.value);
+				for (i = 0; i < 4; i++) {
+					if (state->keys[hat_keys[i]] == old_keys[i])
+						continue;
+					if (is_down)
+						*is_down = state->keys[hat_keys[i]];
+					key = hat_keys[i];
+					goto finish;
+				}
+			}
+			continue;
 		default:
 			break;
 		}

@@ -61,6 +61,10 @@ static const struct in_default_bind in_evdev_defbinds[] = {
 };
 
 const struct menu_keymap in_h150101_sdl2_joy_map[] = {
+	{ H150101_SDL2_AXIS_NEG(0),  PBTN_LEFT },
+	{ H150101_SDL2_AXIS_POS(0),  PBTN_RIGHT },
+	{ H150101_SDL2_AXIS_NEG(1),  PBTN_UP },
+	{ H150101_SDL2_AXIS_POS(1),  PBTN_DOWN },
     { H150101_SDL2_BUTTON(13),  PBTN_UP },
     { H150101_SDL2_BUTTON(14),  PBTN_DOWN },
     { H150101_SDL2_BUTTON(15),  PBTN_LEFT },
