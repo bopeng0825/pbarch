@@ -63,7 +63,8 @@ me_bind_action mednafen_wswan_ctrl_actions[] =
 
 const struct core_override_fast_forward mednafen_wswan_fast_forward = {
 	.type_key = "wswan_frameskip",
-	.type_value = "auto",
+	.type_value = "disabled",
+	.interval_key = "wswan_frameskip_interval",
 };
 
 #define mednafen_wswan_overrides {                              \

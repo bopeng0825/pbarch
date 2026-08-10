@@ -141,7 +141,7 @@ me_bind_action mednafen_pce_fast_ctrl_actions[] =
 
 const struct core_override_fast_forward mednafen_pce_fast_fast_forward = {
 	.type_key = "pce_fast_frameskip",
-	.type_value = "auto",
+	.type_value = "disabled",
 	.interval_key = "pce_fast_frameskip_interval",
 };
 
