@@ -110,6 +110,28 @@ class H15010xTwoPlayerTest(unittest.TestCase):
         self.assertNotIn("quit_count", source)
         self.assertNotIn("EACTION_QUIT", update)
 
+    def test_select_start_state_is_resynced_before_combo_detection(self):
+        source = (ROOT / "plat_h150101_sdl2_input.c").read_text(
+            encoding="utf-8"
+        )
+        update = source[
+            source.index("static int h150101_sdl2_update("):
+            source.index("static int h150101_sdl2_update_keycode")
+        ]
+
+        joystick_update = update.index("SDL_JoystickUpdate();")
+        self.assertIn("\tsync_button_key(state, 8);", update)
+        self.assertIn("\tsync_button_key(state, 9);", update)
+        sync_select = update.index("\tsync_button_key(state, 8);")
+        sync_start = update.index("\tsync_button_key(state, 9);")
+        combo_check = update.index(
+            "state->keys[H150101_SDL2_BUTTON(8)] &&"
+        )
+
+        self.assertLess(joystick_update, sync_select)
+        self.assertLess(sync_select, sync_start)
+        self.assertLess(sync_start, combo_check)
+
     def test_core_routes_joypad_queries_by_libretro_port(self):
         source = (ROOT / "core.c").read_text(encoding="utf-8")
 

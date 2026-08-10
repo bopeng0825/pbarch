@@ -286,8 +286,8 @@ static int h150101_sdl2_update(void *drv_data, const int *binds, int *result)
 	poll_events(state);
 	SDL_JoystickUpdate();
 
-	// sync_button_key(state, 8);
-	// sync_button_key(state, 9);
+	sync_button_key(state, 8);
+	sync_button_key(state, 9);
 
 
 	if (state->keys[H150101_SDL2_BUTTON(8)] &&
