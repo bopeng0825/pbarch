@@ -5,7 +5,7 @@
 #include "libpicofe/input.h"
 
 #define H150101_SDL2_BUTTON_COUNT 32
-#define H150101_SDL2_AXIS_COUNT 4
+#define H150101_SDL2_AXIS_COUNT 8
 
 #define H150101_SDL2_BUTTON(button) (SDL_NUM_SCANCODES + (button))
 #define H150101_SDL2_AXIS_NEG(axis) (SDL_NUM_SCANCODES + H150101_SDL2_BUTTON_COUNT + (axis) * 2)

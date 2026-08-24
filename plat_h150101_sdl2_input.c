@@ -69,6 +69,14 @@ static const char * const h150101_sdl2_key_names[H150101_SDL2_KEY_COUNT] = {
 	[H150101_SDL2_AXIS_POS(2)] = "axis 2+",
 	[H150101_SDL2_AXIS_NEG(3)] = "axis 3-",
 	[H150101_SDL2_AXIS_POS(3)] = "axis 3+",
+	[H150101_SDL2_AXIS_NEG(4)] = "axis 4-",
+	[H150101_SDL2_AXIS_POS(4)] = "axis 4+",
+	[H150101_SDL2_AXIS_NEG(5)] = "axis 5-",
+	[H150101_SDL2_AXIS_POS(5)] = "axis 5+",
+	[H150101_SDL2_AXIS_NEG(6)] = "axis 6-",
+	[H150101_SDL2_AXIS_POS(6)] = "axis 6+",
+	[H150101_SDL2_AXIS_NEG(7)] = "axis 7-",
+	[H150101_SDL2_AXIS_POS(7)] = "axis 7+",
 };
 
 static int is_joy_event(Uint32 type)

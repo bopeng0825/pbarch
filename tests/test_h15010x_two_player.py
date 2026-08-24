@@ -7,6 +7,28 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 
 
 class H15010xTwoPlayerTest(unittest.TestCase):
+    def test_sdl2_supports_eight_axes_without_new_defaults(self):
+        header = (ROOT / "plat_h150101_sdl2_input.h").read_text(
+            encoding="utf-8"
+        )
+        input_source = (ROOT / "plat_h150101_sdl2_input.c").read_text(
+            encoding="utf-8"
+        )
+        platform = (ROOT / "plat_h150101.c").read_text(encoding="utf-8")
+
+        self.assertIn("#define H150101_SDL2_AXIS_COUNT 8", header)
+        for axis in range(4, 8):
+            self.assertIn(
+                f'[H150101_SDL2_AXIS_NEG({axis})] = "axis {axis}-"',
+                input_source,
+            )
+            self.assertIn(
+                f'[H150101_SDL2_AXIS_POS({axis})] = "axis {axis}+"',
+                input_source,
+            )
+            self.assertNotIn(f"H150101_SDL2_AXIS_NEG({axis}),", platform)
+            self.assertNotIn(f"H150101_SDL2_AXIS_POS({axis}),", platform)
+
     def test_input_has_a_separate_player_two_result_slot(self):
         header = (ROOT / "libpicofe/input.h").read_text(encoding="utf-8")
 

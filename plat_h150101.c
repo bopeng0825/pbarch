@@ -74,8 +74,8 @@ const struct menu_keymap in_h150101_sdl2_joy_map[] = {
     { H150101_SDL2_AXIS_NEG(2),  PBTN_LEFT },
     { H150101_SDL2_AXIS_POS(2),  PBTN_RIGHT },
 
-    { H150101_SDL2_BUTTON(0),    PBTN_MOK },
-    { H150101_SDL2_BUTTON(1),    PBTN_MBACK },
+    { H150101_SDL2_BUTTON(0),    PBTN_MBACK },
+    { H150101_SDL2_BUTTON(1),    PBTN_MOK },
     { H150101_SDL2_BUTTON(2),    PBTN_MA2 },
     { H150101_SDL2_BUTTON(3),    PBTN_MA3 },
     { H150101_SDL2_BUTTON(4),    PBTN_L },
