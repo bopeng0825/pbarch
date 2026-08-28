@@ -463,6 +463,8 @@ static int h150101_sdl2_config_match(const char *configured_name,
 	if (strncmp(configured_name, IN_H150101_SDL2_PREFIX, prefix_len) != 0 ||
 	    strncmp(device_name, p2_prefix, p2_len) != 0)
 		return 0;
+	if (strncmp(configured_name + prefix_len, "p2:", 3) == 0)
+		return 0;
 
 	return strcmp(configured_name + prefix_len, device_name + p2_len) == 0;
 }

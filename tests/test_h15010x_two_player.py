@@ -61,11 +61,57 @@ class H15010xTwoPlayerTest(unittest.TestCase):
             driver,
         )
 
+    def test_explicit_player_two_config_never_aliases(self):
+        driver = (ROOT / "plat_h150101_sdl2_input.c").read_text(
+            encoding="utf-8"
+        )
+        matcher = driver[
+            driver.index("static int h150101_sdl2_config_match"):
+            driver.index("static int h150101_sdl2_clean_binds")
+        ]
+        explicit_p2_guard = (
+            'strncmp(configured_name + prefix_len, "p2:", 3) == 0'
+        )
+
+        self.assertIn(explicit_p2_guard, matcher)
+        self.assertLess(
+            matcher.index(explicit_p2_guard),
+            matcher.index("device_name + p2_len"),
+        )
+
     def test_multi_device_config_results_are_unique_and_bounded(self):
         source = (ROOT / "libpicofe/input.c").read_text(encoding="utf-8")
-        self.assertIn("int in_config_parse_devs", source)
-        self.assertIn("count < max_ids", source)
-        self.assertIn("dev_ids[j] == i", source)
+        parser = source[
+            source.index("int in_config_parse_devs"):
+            source.index("int in_config_bind_key")
+        ]
+
+        capacity_guard = "i < in_dev_count && count < max_ids"
+        uniqueness_check = "dev_ids[j] == i"
+        alias_append = "dev_ids[count++] = i"
+        self.assertIn(capacity_guard, parser)
+        self.assertIn(uniqueness_check, parser)
+        self.assertIn(alias_append, parser)
+        self.assertLess(parser.index(capacity_guard), parser.index(alias_append))
+        self.assertLess(parser.index(uniqueness_check), parser.index(alias_append))
+
+    def test_config_sections_clear_targets_before_applying_in_file_order(self):
+        source = (ROOT / "libpicofe/config_file.c").read_text(
+            encoding="utf-8"
+        )
+        reader = source[
+            source.index("void config_read_keys"):
+            source.index("in_clean_binds();", source.index("void config_read_keys"))
+        ]
+        section_loop = 'while (p != NULL && (p = strstr(p, "binddev = "))'
+        clear_loop = "in_unbind_all(dev_ids[i], -1, -1);"
+        bind_loop = "in_config_bind_key(dev_ids[i], key, bind, bindtype);"
+
+        self.assertEqual(reader.count(section_loop), 1)
+        self.assertEqual(reader.count(clear_loop), 1)
+        self.assertEqual(reader.count(bind_loop), 1)
+        self.assertLess(reader.index(section_loop), reader.index(clear_loop))
+        self.assertLess(reader.index(clear_loop), reader.index(bind_loop))
 
     def test_sdl2_supports_eight_axes_without_new_defaults(self):
         header = (ROOT / "plat_h150101_sdl2_input.h").read_text(

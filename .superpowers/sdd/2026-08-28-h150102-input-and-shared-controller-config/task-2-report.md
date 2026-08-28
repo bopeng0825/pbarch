@@ -83,3 +83,50 @@ OK
 
 - No device cross-build was possible in the available environment.
 - The two full-suite failures are pre-existing and outside Task 2 scope.
+
+## Fix Round 1
+
+Review identified a namespace collision in the shared SDL2 matcher. A configured
+name such as `h150101-sdl2:p2:X` could match a P1 controller literally named
+`p2:X` and then alias a P2 controller named `p2:p2:X`. The matcher now keeps its
+exact-match path, but rejects any configured suffix beginning with `p2:` before
+performing base-to-P2 alias matching.
+
+The executable Python guards were strengthened to check:
+
+- explicit P2 rejection appears before the alias suffix comparison;
+- different names remain governed by a full suffix `strcmp`;
+- result capacity guards and uniqueness checks precede alias insertion;
+- each config section clears all targets before applying bindings, within the
+  single file-order section loop.
+
+### Fix Round RED
+
+Command:
+
+```text
+C:\Users\shzjt\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe -m unittest tests.test_h15010x_two_player.H15010xTwoPlayerTest.test_explicit_player_two_config_never_aliases -v
+```
+
+Result: exit 1. The test failed because the explicit configured-suffix
+`strncmp(..., "p2:", 3)` guard was absent from the matcher.
+
+### Fix Round GREEN
+
+The same command after the matcher change returned exit 0:
+
+```text
+Ran 1 test in 0.001s
+OK
+```
+
+Focused amended-file verification:
+
+```text
+C:\Users\shzjt\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe -m unittest tests.test_h15010x_two_player -v
+Ran 15 tests in 0.010s
+OK
+```
+
+The deferred `bind_analog` first-target behavior was intentionally unchanged;
+the analog slot is global and cannot represent multiple target IDs.
