@@ -4,9 +4,9 @@
 #include <SDL/SDL.h>
 #include "libpicofe/input.h"
 #include "main.h"
+#include "plat_h150101_sdl2_config.h"
 #include "plat_h150101_sdl2_input.h"
 
-#define IN_H150101_SDL2_PREFIX "h150101-sdl2:"
 #define AXIS_DEADZONE 16384
 
 struct h150101_sdl2_state {
@@ -449,24 +449,6 @@ static int h150101_sdl2_menu_translate(void *drv_data, int keycode, char *charco
 		if (map[i].key == keycode)
 			return map[i].pbtn;
 	return 0;
-}
-
-static int h150101_sdl2_config_match(const char *configured_name,
-	const char *device_name)
-{
-	size_t prefix_len = strlen(IN_H150101_SDL2_PREFIX);
-	const char *p2_prefix = IN_H150101_SDL2_PREFIX "p2:";
-	size_t p2_len = strlen(p2_prefix);
-
-	if (strcmp(configured_name, device_name) == 0)
-		return 1;
-	if (strncmp(configured_name, IN_H150101_SDL2_PREFIX, prefix_len) != 0 ||
-	    strncmp(device_name, p2_prefix, p2_len) != 0)
-		return 0;
-	if (strncmp(configured_name + prefix_len, "p2:", 3) == 0)
-		return 0;
-
-	return strcmp(configured_name + prefix_len, device_name + p2_len) == 0;
 }
 
 static int h150101_sdl2_clean_binds(void *drv_data, int *binds, int *def_binds)

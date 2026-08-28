@@ -1,5 +1,8 @@
 import pathlib
 import re
+import shutil
+import subprocess
+import tempfile
 import unittest
 
 
@@ -7,6 +10,41 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 
 
 class H15010xTwoPlayerTest(unittest.TestCase):
+    def test_config_match_preserves_positional_initializer_compatibility(self):
+        header = (ROOT / "libpicofe/input.h").read_text(encoding="utf-8")
+        driver = header[
+            header.index("struct InputDriver {"):
+            header.index("};", header.index("struct InputDriver {"))
+        ]
+
+        self.assertLess(driver.index("const void *pdata;"),
+                        driver.index("(*config_match)"))
+
+    def test_shared_config_behavior_harness(self):
+        compiler = next(
+            (path for name in ("cc", "gcc", "clang")
+             if (path := shutil.which(name))),
+            None,
+        )
+        if compiler is None:
+            self.skipTest("no C compiler available for behavioral harness")
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            executable = pathlib.Path(tmpdir) / "h15010x_config_harness"
+            command = [
+                compiler,
+                "-std=c99",
+                "-D_POSIX_C_SOURCE=200809L",
+                "-I", str(ROOT),
+                "-I", str(ROOT / "libpicofe"),
+                str(ROOT / "tests/h15010x_config_harness.c"),
+                str(ROOT / "libpicofe/input.c"),
+                str(ROOT / "libpicofe/config_file.c"),
+                "-o", str(executable),
+            ]
+            subprocess.run(command, check=True, cwd=ROOT)
+            subprocess.run([str(executable)], check=True, cwd=ROOT)
+
     def test_base_device_config_matches_identical_player_two(self):
         header = (ROOT / "libpicofe/input.h").read_text(encoding="utf-8")
         input_source = (ROOT / "libpicofe/input.c").read_text(
@@ -16,6 +54,9 @@ class H15010xTwoPlayerTest(unittest.TestCase):
             encoding="utf-8"
         )
         driver = (ROOT / "plat_h150101_sdl2_input.c").read_text(
+            encoding="utf-8"
+        )
+        matcher = (ROOT / "plat_h150101_sdl2_config.h").read_text(
             encoding="utf-8"
         )
 
@@ -34,6 +75,7 @@ class H15010xTwoPlayerTest(unittest.TestCase):
             input_source,
         )
         self.assertIn(".config_match   = h150101_sdl2_config_match", driver)
+        self.assertIn("h150101_sdl2_config_match", matcher)
         self.assertIn(
             "in_config_parse_devs(dev, dev_ids, IN_MAX_DEVS)",
             config_source,
@@ -50,25 +92,21 @@ class H15010xTwoPlayerTest(unittest.TestCase):
         )
 
     def test_shared_matcher_restricts_aliases_to_identical_names(self):
-        driver = (ROOT / "plat_h150101_sdl2_input.c").read_text(
+        matcher = (ROOT / "plat_h150101_sdl2_config.h").read_text(
             encoding="utf-8"
         )
-        self.assertIn("static int h150101_sdl2_config_match", driver)
-        self.assertIn("strcmp(configured_name, device_name) == 0", driver)
-        self.assertIn('IN_H150101_SDL2_PREFIX "p2:"', driver)
+        self.assertIn("h150101_sdl2_config_match", matcher)
+        self.assertIn("strcmp(configured_name, device_name) == 0", matcher)
+        self.assertIn('IN_H150101_SDL2_PREFIX "p2:"', matcher)
         self.assertIn(
             "strcmp(configured_name + prefix_len, device_name + p2_len) == 0",
-            driver,
+            matcher,
         )
 
     def test_explicit_player_two_config_never_aliases(self):
-        driver = (ROOT / "plat_h150101_sdl2_input.c").read_text(
+        matcher = (ROOT / "plat_h150101_sdl2_config.h").read_text(
             encoding="utf-8"
         )
-        matcher = driver[
-            driver.index("static int h150101_sdl2_config_match"):
-            driver.index("static int h150101_sdl2_clean_binds")
-        ]
         explicit_p2_guard = (
             'strncmp(configured_name + prefix_len, "p2:", 3) == 0'
         )

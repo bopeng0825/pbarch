@@ -43,6 +43,7 @@ The shared matching behavior is part of the common SDL2 input driver, so it appl
 - Existing explicit P2 sections keep working.
 - Drivers that do not provide the new callback retain exact device-name matching.
 - Player action syntax is unchanged; both physical-device sections continue to use `player1` actions because the SDL2 driver routes its second physical device to libretro port 2.
+- `bind_analog` remains single-owner and uses the first matched target. The global `in_adev` slot stores only one device ID, so shared analog ownership would require a separate data-model redesign and is outside this change.
 - No wildcard syntax is introduced.
 
 ## Error Handling

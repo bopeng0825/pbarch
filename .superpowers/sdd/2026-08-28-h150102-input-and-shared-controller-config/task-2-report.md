@@ -130,3 +130,69 @@ OK
 
 The deferred `bind_analog` first-target behavior was intentionally unchanged;
 the analog slot is global and cannot represent multiple target IDs.
+
+## Final Review Fix Wave
+
+### Changes
+
+- Moved `in_drv_t.config_match` after the existing `defbinds` and `pdata`
+  fields, preserving the mapping of downstream positional initializers.
+- Extracted the pure shared SDL2 name matcher into
+  `plat_h150101_sdl2_config.h`. The production driver and behavioral harness
+  now compile the same implementation.
+- Added `tests/h15010x_config_harness.c` and a Python compile/run test. On a
+  capable CI host, the harness links the real `libpicofe/input.c` and
+  `libpicofe/config_file.c`, registers two real input devices, and verifies:
+  base-to-both matching, explicit-P2-only replacement, different-name
+  isolation, unique IDs, and capacity limits.
+- Updated the English design and the `ANALOG_BINDS` loader comment: `in_adev`
+  stores one device ID, so `bind_analog` intentionally remains first-target and
+  single-owner. Shared analog ownership requires a separate redesign.
+
+Files added or changed in this wave:
+
+- `libpicofe/input.h`
+- `libpicofe/config_file.c`
+- `plat_h150101_sdl2_config.h`
+- `plat_h150101_sdl2_input.c`
+- `tests/h15010x_config_harness.c`
+- `tests/test_h15010x_two_player.py`
+- `docs/superpowers/specs/2026-08-28-h150102-input-and-shared-controller-config-design.md`
+- `.superpowers/sdd/2026-08-28-h150102-input-and-shared-controller-config/task-2-report.md`
+
+### Compatibility RED
+
+```text
+C:\Users\shzjt\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe -m unittest tests.test_h15010x_two_player.H15010xTwoPlayerTest.test_config_match_preserves_positional_initializer_compatibility tests.test_h15010x_two_player.H15010xTwoPlayerTest.test_shared_config_behavior_harness -v
+```
+
+Result: exit 1. The positional-compatibility test reported that `pdata`
+followed `config_match`. The behavioral harness was discovered and skipped with
+`no C compiler available for behavioral harness`.
+
+### Compatibility GREEN and Local Harness Evidence
+
+The same command after moving the field returned:
+
+```text
+Ran 2 tests in 0.027s
+OK (skipped=1)
+```
+
+The compatibility test passed. The behavioral test again reported the explicit
+local skip because `cc`, `gcc`, and `clang` are all absent. Its compile/run path
+remains active for capable CI environments.
+
+Focused H15010x verification:
+
+```text
+C:\Users\shzjt\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe -m unittest tests.test_h15010x_two_player -v
+Ran 17 tests in 0.029s
+OK (skipped=1)
+```
+
+`git diff --check` passed in the parent repository and `libpicofe` submodule.
+
+Final-wave nested commit:
+
+- `libpicofe`: `257f34f preserve input driver initializer layout`
