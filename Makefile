@@ -157,7 +157,7 @@ else ifeq ($(platform), h150101)
 	LDFLAGS += -fPIC
 else ifeq ($(platform), h150102)
 	SOURCES := $(filter-out libpicofe/in_sdl.c,$(SOURCES))
-	SOURCES += plat_h150101.c plat_h150101_sdl2_input.c
+	SOURCES += plat_h150102.c plat_h150101_sdl2_input.c
 	SOURCES += menu_sdl2.c text_cache.c
 	CFLAGS += -DUSE_SDL2 $(shell $(SYSROOT)/usr/bin/sdl2-config --cflags)
 	CFLAGS += -DCONTENT_DIR='"/mnt"' -DH150102 -march=mips32r2 -mhard-float

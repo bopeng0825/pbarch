@@ -17,13 +17,13 @@ def make_branch(makefile, platform):
 
 
 class H150102PlatformTest(unittest.TestCase):
-    def test_build_target_reuses_h150101_platform(self):
+    def test_build_target_selects_h150102_platform_input(self):
         makefile = (ROOT / "Makefile").read_text(encoding="utf-8")
         branch = make_branch(makefile, "h150102")
 
         self.assertTrue(branch)
         for expected in (
-            "plat_h150101.c",
+            "plat_h150102.c",
             "plat_h150101_sdl2_input.c",
             "menu_sdl2.c",
             "text_cache.c",
@@ -35,8 +35,23 @@ class H150102PlatformTest(unittest.TestCase):
             'CONTENT_DIR=\'"/mnt"\'',
         ):
             self.assertIn(expected, branch)
-        self.assertNotIn("plat_h150102.c", branch)
+        self.assertNotIn("plat_h150101.c", branch)
         self.assertNotIn("plat_h150102_sdl2_input.c", branch)
+
+    def test_h150102_starts_with_h150101_input_layout(self):
+        platform_sources = [
+            (ROOT / filename).read_text(encoding="utf-8")
+            for filename in ("plat_h150101.c", "plat_h150102.c")
+        ]
+
+        for source in platform_sources:
+            for mapping in (
+                "H150101_SDL2_BUTTON(0),    IN_BINDTYPE_PLAYER12, RETRO_DEVICE_ID_JOYPAD_B",
+                "H150101_SDL2_BUTTON(1),    IN_BINDTYPE_PLAYER12, RETRO_DEVICE_ID_JOYPAD_A",
+                "H150101_SDL2_BUTTON(0),    PBTN_MBACK",
+                "H150101_SDL2_BUTTON(1),    PBTN_MOK",
+            ):
+                self.assertIn(mapping, source)
 
     def test_resolution_constants_are_device_specific(self):
         scale_h = (ROOT / "scale.h").read_text(encoding="utf-8")
