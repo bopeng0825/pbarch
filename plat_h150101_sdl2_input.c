@@ -294,12 +294,12 @@ static int h150101_sdl2_update(void *drv_data, const int *binds, int *result)
 	poll_events(state);
 	SDL_JoystickUpdate();
 
-	sync_button_key(state, 8);
-	sync_button_key(state, 9);
+	sync_button_key(state, h150101_sdl2_menu_combo[0]);
+	sync_button_key(state, h150101_sdl2_menu_combo[1]);
 
 
-	if (state->keys[H150101_SDL2_BUTTON(8)] &&
-	    state->keys[H150101_SDL2_BUTTON(9)]) {
+	if (state->keys[H150101_SDL2_BUTTON(h150101_sdl2_menu_combo[0])] &&
+	    state->keys[H150101_SDL2_BUTTON(h150101_sdl2_menu_combo[1])]) {
 		if (!state->menu_combo_latched) {
 			result[IN_BINDTYPE_EMU] |= 1 << EACTION_MENU;
 			state->menu_combo_latched = 1;
@@ -317,8 +317,8 @@ static int h150101_sdl2_update(void *drv_data, const int *binds, int *result)
 
 
 		for (b = 0; b < IN_BINDTYPE_COUNT; b++) {
-			if ((i == H150101_SDL2_BUTTON(8) ||
-			     i == H150101_SDL2_BUTTON(9)) &&
+			if ((i == H150101_SDL2_BUTTON(h150101_sdl2_menu_combo[0]) ||
+			     i == H150101_SDL2_BUTTON(h150101_sdl2_menu_combo[1])) &&
 			    b == IN_BINDTYPE_EMU)
 				continue;
 

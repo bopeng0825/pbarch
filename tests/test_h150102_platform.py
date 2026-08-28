@@ -53,6 +53,19 @@ class H150102PlatformTest(unittest.TestCase):
             ):
                 self.assertIn(mapping, source)
 
+    def test_each_platform_supplies_its_select_start_menu_combo(self):
+        h150101 = (ROOT / "plat_h150101.c").read_text(encoding="utf-8")
+        h150102 = (ROOT / "plat_h150102.c").read_text(encoding="utf-8")
+
+        self.assertRegex(
+            h150101,
+            r"h150101_sdl2_menu_combo\[2\]\s*=\s*\{\s*8,\s*9\s*\}",
+        )
+        self.assertRegex(
+            h150102,
+            r"h150101_sdl2_menu_combo\[2\]\s*=\s*\{\s*10,\s*11\s*\}",
+        )
+
     def test_resolution_constants_are_device_specific(self):
         scale_h = (ROOT / "scale.h").read_text(encoding="utf-8")
 

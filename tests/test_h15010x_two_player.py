@@ -266,8 +266,8 @@ class H15010xTwoPlayerTest(unittest.TestCase):
         self.assertIn("int menu_combo_latched;", state)
         self.assertRegex(
             update,
-            r"state->keys\[H150101_SDL2_BUTTON\(8\)\]\s*&&\s*"
-            r"state->keys\[H150101_SDL2_BUTTON\(9\)\]",
+            r"state->keys\[H150101_SDL2_BUTTON\(h150101_sdl2_menu_combo\[0\]\)\]"
+            r"\s*&&\s*state->keys\[H150101_SDL2_BUTTON\(h150101_sdl2_menu_combo\[1\]\)\]",
         )
         self.assertIn("!state->menu_combo_latched", update)
         self.assertIn("1 << EACTION_MENU", update)
@@ -286,12 +286,20 @@ class H15010xTwoPlayerTest(unittest.TestCase):
         ]
 
         joystick_update = update.index("SDL_JoystickUpdate();")
-        self.assertIn("\tsync_button_key(state, 8);", update)
-        self.assertIn("\tsync_button_key(state, 9);", update)
-        sync_select = update.index("\tsync_button_key(state, 8);")
-        sync_start = update.index("\tsync_button_key(state, 9);")
+        self.assertIn(
+            "\tsync_button_key(state, h150101_sdl2_menu_combo[0]);", update
+        )
+        self.assertIn(
+            "\tsync_button_key(state, h150101_sdl2_menu_combo[1]);", update
+        )
+        sync_select = update.index(
+            "\tsync_button_key(state, h150101_sdl2_menu_combo[0]);"
+        )
+        sync_start = update.index(
+            "\tsync_button_key(state, h150101_sdl2_menu_combo[1]);"
+        )
         combo_check = update.index(
-            "state->keys[H150101_SDL2_BUTTON(8)] &&"
+            "state->keys[H150101_SDL2_BUTTON(h150101_sdl2_menu_combo[0])] &&"
         )
 
         self.assertLess(joystick_update, sync_select)

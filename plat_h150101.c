@@ -10,6 +10,8 @@
 
 #define MAX_SAMPLE_RATE 48000
 
+const int h150101_sdl2_menu_combo[2] = { 8, 9 };
+
 static const struct in_default_bind in_h150101_sdl2_defbinds[] = {
     { H150101_SDL2_BUTTON(13),   IN_BINDTYPE_PLAYER12, RETRO_DEVICE_ID_JOYPAD_UP },
     { H150101_SDL2_BUTTON(14),   IN_BINDTYPE_PLAYER12, RETRO_DEVICE_ID_JOYPAD_DOWN },
@@ -39,27 +41,6 @@ static const struct in_default_bind in_h150101_sdl2_defbinds[] = {
     { 0, 0, 0 }
 };
 
-static const struct in_default_bind in_evdev_defbinds[] = {
-    { BTN_DPAD_UP,              IN_BINDTYPE_PLAYER12, RETRO_DEVICE_ID_JOYPAD_UP },
-    { BTN_DPAD_DOWN,            IN_BINDTYPE_PLAYER12, RETRO_DEVICE_ID_JOYPAD_DOWN },
-    { BTN_DPAD_LEFT,            IN_BINDTYPE_PLAYER12, RETRO_DEVICE_ID_JOYPAD_LEFT },
-    { BTN_DPAD_RIGHT,           IN_BINDTYPE_PLAYER12, RETRO_DEVICE_ID_JOYPAD_RIGHT },
-
-    { BTN_SOUTH,                IN_BINDTYPE_PLAYER12, RETRO_DEVICE_ID_JOYPAD_B },
-    { BTN_EAST,                 IN_BINDTYPE_PLAYER12, RETRO_DEVICE_ID_JOYPAD_A },
-    { BTN_WEST,                 IN_BINDTYPE_PLAYER12, RETRO_DEVICE_ID_JOYPAD_Y },
-    { BTN_NORTH,                IN_BINDTYPE_PLAYER12, RETRO_DEVICE_ID_JOYPAD_X },
-
-    { BTN_TL,                   IN_BINDTYPE_PLAYER12, RETRO_DEVICE_ID_JOYPAD_L },
-    { BTN_TR,                   IN_BINDTYPE_PLAYER12, RETRO_DEVICE_ID_JOYPAD_R },
-
-    { BTN_START,                IN_BINDTYPE_PLAYER12, RETRO_DEVICE_ID_JOYPAD_START },
-    { BTN_SELECT,               IN_BINDTYPE_PLAYER12, RETRO_DEVICE_ID_JOYPAD_SELECT },
-
-    { BTN_MODE,                 IN_BINDTYPE_EMU, EACTION_MENU },
-    { 0, 0, 0 }
-};
-
 const struct menu_keymap in_h150101_sdl2_joy_map[] = {
 	{ H150101_SDL2_AXIS_NEG(0),  PBTN_LEFT },
 	{ H150101_SDL2_AXIS_POS(0),  PBTN_RIGHT },
@@ -81,6 +62,27 @@ const struct menu_keymap in_h150101_sdl2_joy_map[] = {
     { H150101_SDL2_BUTTON(4),    PBTN_L },
     { H150101_SDL2_BUTTON(5),    PBTN_R },
     { H150101_SDL2_BUTTON(10),   PBTN_MENU },
+};
+
+static const struct in_default_bind in_evdev_defbinds[] = {
+    { BTN_DPAD_UP,              IN_BINDTYPE_PLAYER12, RETRO_DEVICE_ID_JOYPAD_UP },
+    { BTN_DPAD_DOWN,            IN_BINDTYPE_PLAYER12, RETRO_DEVICE_ID_JOYPAD_DOWN },
+    { BTN_DPAD_LEFT,            IN_BINDTYPE_PLAYER12, RETRO_DEVICE_ID_JOYPAD_LEFT },
+    { BTN_DPAD_RIGHT,           IN_BINDTYPE_PLAYER12, RETRO_DEVICE_ID_JOYPAD_RIGHT },
+
+    { BTN_SOUTH,                IN_BINDTYPE_PLAYER12, RETRO_DEVICE_ID_JOYPAD_B },
+    { BTN_EAST,                 IN_BINDTYPE_PLAYER12, RETRO_DEVICE_ID_JOYPAD_A },
+    { BTN_WEST,                 IN_BINDTYPE_PLAYER12, RETRO_DEVICE_ID_JOYPAD_Y },
+    { BTN_NORTH,                IN_BINDTYPE_PLAYER12, RETRO_DEVICE_ID_JOYPAD_X },
+
+    { BTN_TL,                   IN_BINDTYPE_PLAYER12, RETRO_DEVICE_ID_JOYPAD_L },
+    { BTN_TR,                   IN_BINDTYPE_PLAYER12, RETRO_DEVICE_ID_JOYPAD_R },
+
+    { BTN_START,                IN_BINDTYPE_PLAYER12, RETRO_DEVICE_ID_JOYPAD_START },
+    { BTN_SELECT,               IN_BINDTYPE_PLAYER12, RETRO_DEVICE_ID_JOYPAD_SELECT },
+
+    { BTN_MODE,                 IN_BINDTYPE_EMU, EACTION_MENU },
+    { 0, 0, 0 }
 };
 
 const struct menu_keymap in_evdev_key_map[] = {
