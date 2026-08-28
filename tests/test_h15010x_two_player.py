@@ -7,6 +7,66 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 
 
 class H15010xTwoPlayerTest(unittest.TestCase):
+    def test_base_device_config_matches_identical_player_two(self):
+        header = (ROOT / "libpicofe/input.h").read_text(encoding="utf-8")
+        input_source = (ROOT / "libpicofe/input.c").read_text(
+            encoding="utf-8"
+        )
+        config_source = (ROOT / "libpicofe/config_file.c").read_text(
+            encoding="utf-8"
+        )
+        driver = (ROOT / "plat_h150101_sdl2_input.c").read_text(
+            encoding="utf-8"
+        )
+
+        self.assertIn(
+            "int (*config_match)(const char *configured_name, "
+            "const char *device_name);",
+            header,
+        )
+        self.assertIn(
+            "int  in_config_parse_devs(const char *name, int *dev_ids, "
+            "int max_ids);",
+            header,
+        )
+        self.assertIn(
+            "DRV(dev->drv_id).config_match(name, dev->name)",
+            input_source,
+        )
+        self.assertIn(".config_match   = h150101_sdl2_config_match", driver)
+        self.assertIn(
+            "in_config_parse_devs(dev, dev_ids, IN_MAX_DEVS)",
+            config_source,
+        )
+        self.assertRegex(
+            config_source,
+            r"for \(i = 0; i < dev_count; i\+\+\)\s+"
+            r"in_unbind_all\(dev_ids\[i\], -1, -1\);",
+        )
+        self.assertRegex(
+            config_source,
+            r"for \(i = 0; i < dev_count; i\+\+\)\s+"
+            r"in_config_bind_key\(dev_ids\[i\], key, bind, bindtype\);",
+        )
+
+    def test_shared_matcher_restricts_aliases_to_identical_names(self):
+        driver = (ROOT / "plat_h150101_sdl2_input.c").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("static int h150101_sdl2_config_match", driver)
+        self.assertIn("strcmp(configured_name, device_name) == 0", driver)
+        self.assertIn('IN_H150101_SDL2_PREFIX "p2:"', driver)
+        self.assertIn(
+            "strcmp(configured_name + prefix_len, device_name + p2_len) == 0",
+            driver,
+        )
+
+    def test_multi_device_config_results_are_unique_and_bounded(self):
+        source = (ROOT / "libpicofe/input.c").read_text(encoding="utf-8")
+        self.assertIn("int in_config_parse_devs", source)
+        self.assertIn("count < max_ids", source)
+        self.assertIn("dev_ids[j] == i", source)
+
     def test_sdl2_supports_eight_axes_without_new_defaults(self):
         header = (ROOT / "plat_h150101_sdl2_input.h").read_text(
             encoding="utf-8"

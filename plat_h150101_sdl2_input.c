@@ -451,6 +451,22 @@ static int h150101_sdl2_menu_translate(void *drv_data, int keycode, char *charco
 	return 0;
 }
 
+static int h150101_sdl2_config_match(const char *configured_name,
+	const char *device_name)
+{
+	size_t prefix_len = strlen(IN_H150101_SDL2_PREFIX);
+	const char *p2_prefix = IN_H150101_SDL2_PREFIX "p2:";
+	size_t p2_len = strlen(p2_prefix);
+
+	if (strcmp(configured_name, device_name) == 0)
+		return 1;
+	if (strncmp(configured_name, IN_H150101_SDL2_PREFIX, prefix_len) != 0 ||
+	    strncmp(device_name, p2_prefix, p2_len) != 0)
+		return 0;
+
+	return strcmp(configured_name + prefix_len, device_name + p2_len) == 0;
+}
+
 static int h150101_sdl2_clean_binds(void *drv_data, int *binds, int *def_binds)
 {
 	int i, t, cnt = 0;
@@ -477,6 +493,7 @@ static const in_drv_t h150101_sdl2_drv = {
 	.update_keycode = h150101_sdl2_update_keycode,
 	.menu_translate = h150101_sdl2_menu_translate,
 	.clean_binds    = h150101_sdl2_clean_binds,
+	.config_match   = h150101_sdl2_config_match,
 };
 
 int in_h150101_sdl2_init(const struct in_pdata *pdata, void (*handler)(void *event))
