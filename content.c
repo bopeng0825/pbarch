@@ -283,36 +283,6 @@ struct content *content_init(const char *path) {
 	return content;
 }
 
-void content_based_name(const struct content *content,
-                        char *buf, size_t len,
-                        const char *basedir, const char *subdir,
-                        const char *new_extension) {
-	char filename[MAX_PATH];
-	char *path = strdup(content->path);
-	char *dot;
-
-	if (basedir) {
-		if (!subdir)
-			subdir = "";
-
-		strncpy(filename, basename(path), sizeof(filename));
-	} else {
-		basedir = "";
-		subdir = "";
-		strncpy(filename, path, sizeof(filename));
-	}
-
-	filename[sizeof(filename) - 1] = 0;
-
-	dot = strrchr(filename, '.');
-	if (dot)
-		*dot = 0;
-
-	snprintf(buf, len, "%s%s%s%s", basedir, subdir, filename, new_extension);
-
-	free(path);
-}
-
 int content_load_game_info(struct content *content, struct retro_game_info *info, bool needs_fullpath) {
 	const char *path;
 	int ret = -1;

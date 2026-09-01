@@ -943,7 +943,11 @@ int core_load_content(struct content *content) {
 		goto finish;
 	}
 
+#if defined(H150101) || defined(H150102)
+	content_based_name(content, cheats_path, sizeof(cheats_path), NULL, "cheats/", ".cht");
+#else
 	content_based_name(content, cheats_path, sizeof(cheats_path), save_dir, "cheats/", ".cht");
+#endif
 	if (cheats_path[0] != '\0') {
 		cheats = cheats_load(cheats_path);
 		core_apply_cheats(cheats);
