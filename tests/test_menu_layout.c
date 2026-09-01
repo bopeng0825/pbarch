@@ -39,6 +39,7 @@ static void test_responsive_geometry(void)
 	assert(layout.show_preview == 1);
 	assert(layout.menu.w == 228);
 	assert(layout.preview.x == 268);
+	assert(layout.menu.x + layout.menu.w <= layout.preview.x);
 	assert(layout.preview.y == 114);
 	assert(layout.preview.w == 336);
 	assert(layout.preview.h == 252);
@@ -92,6 +93,21 @@ static void test_visible_window_keeps_selection_on_screen(void)
 	assert(first == 0 && count == 3);
 	menu_visible_window(20, 19, 5, &first, &count);
 	assert(first == 15 && count == 5);
+}
+
+static void test_marquee_offset_pauses_scrolls_and_wraps(void)
+{
+	unsigned int cycle_ms;
+
+	assert(menu_marquee_offset(300, 180, 20, 0) == 0);
+	assert(menu_marquee_offset(300, 180, 20, 999) == 0);
+	assert(menu_marquee_offset(300, 180, 20, 1100) == 3);
+	assert(menu_marquee_offset(180, 180, 20, 5000) == 0);
+	assert(menu_marquee_offset(300, 0, 20, 5000) == 0);
+	assert(menu_marquee_offset(INT_MAX, 1, INT_MAX, UINT_MAX) >= 0);
+
+	cycle_ms = 1000 + (320 * 1000 + 29) / 30;
+	assert(menu_marquee_offset(300, 180, 20, cycle_ms) == 0);
 }
 
 static void test_utf8_cell_widths(void)
@@ -197,6 +213,7 @@ int main(void)
 	test_font_sizes();
 	test_responsive_geometry();
 	test_visible_window_keeps_selection_on_screen();
+	test_marquee_offset_pauses_scrolls_and_wraps();
 	test_utf8_cell_widths();
 	test_utf8_truncation();
 	test_utf8_truncation_small_destinations();

@@ -123,7 +123,9 @@ static int parse_cheats(struct cheats *cheats, FILE *file) {
 					goto finish;
 
 				strncpy((char *)cheat->name, buf, len);
+#ifndef USE_SDL2
 				string_truncate((char *)cheat->name, MAX_DESC_LEN);
+#endif
 
 				if (len >= MAX_DESC_LEN) {
 					cheat->info = calloc(len+1, sizeof(char));

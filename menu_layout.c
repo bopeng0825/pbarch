@@ -204,6 +204,37 @@ void menu_visible_window(int total, int selected, int capacity,
 		*count = window_count;
 }
 
+int menu_marquee_offset(int text_width, int viewport_width, int gap_width,
+			unsigned int elapsed_ms)
+{
+	const unsigned int pause_ms = 1000;
+	const unsigned int pixels_per_second = 30;
+	uint64_t distance;
+	uint64_t movement_ms;
+	uint64_t cycle_ms;
+	uint64_t phase;
+	uint64_t offset;
+
+	if (text_width <= viewport_width || viewport_width <= 0 ||
+	    text_width <= 0)
+		return 0;
+	if (gap_width < 0)
+		gap_width = 0;
+
+	distance = (uint64_t)text_width + (uint64_t)gap_width;
+	movement_ms = (distance * 1000 + pixels_per_second - 1) /
+		pixels_per_second;
+	cycle_ms = pause_ms + movement_ms;
+	phase = elapsed_ms % cycle_ms;
+	if (phase < pause_ms)
+		return 0;
+
+	offset = (phase - pause_ms) * pixels_per_second / 1000;
+	if (offset > distance)
+		offset = distance;
+	return (int)offset;
+}
+
 void menu_aspect_fit(int source_width, int source_height,
 		     const struct menu_rect *bounds, struct menu_rect *fitted)
 {

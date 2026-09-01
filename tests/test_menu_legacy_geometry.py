@@ -6,6 +6,9 @@ from pathlib import Path
 MENU_SOURCE = (
 	Path(__file__).resolve().parents[1] / "libpicofe" / "menu.c"
 ).read_text(encoding="utf-8")
+CHEAT_SOURCE = (
+	Path(__file__).resolve().parents[1] / "cheat.c"
+).read_text(encoding="utf-8")
 
 
 class LegacyMenuGeometryTest(unittest.TestCase):
@@ -38,6 +41,42 @@ class LegacyMenuGeometryTest(unittest.TestCase):
 			"wt += 10 * me_mfont_w;",
 			"wt += value_width;",
 		)
+
+	def test_sdl2_layout_is_available_before_entry_geometry(self):
+		body = re.search(
+			r"static void me_draw\(.*?\)\s*\{(?P<body>.*?)"
+			r"\n\}\n\n#ifdef MENU_TEST",
+			MENU_SOURCE,
+			re.DOTALL,
+		)
+		self.assertIsNotNone(body)
+		draw_body = body.group("body")
+		self.assertLess(
+			draw_body.index("menu_draw_begin(1, 0);"),
+			draw_body.index("menu_get_responsive_layout(&layout);"),
+		)
+
+	def test_sdl2_cheat_descriptions_are_not_byte_truncated(self):
+		self.assertRegex(
+			CHEAT_SOURCE,
+			re.compile(
+				r"#ifndef USE_SDL2\s+"
+				r"string_truncate\(\(char \*\)cheat->name, MAX_DESC_LEN\);\s+"
+				r"#endif"
+			),
+		)
+
+	def test_marquee_resets_when_a_menu_is_entered(self):
+		loop = re.search(
+			r"static int me_loop_d\(.*?\)\s*\{(?P<body>.*?)"
+			r"\n\}\n\nstatic int me_loop",
+			MENU_SOURCE,
+			re.DOTALL,
+		)
+		self.assertIsNotNone(loop)
+		body = loop.group("body")
+		self.assertLess(body.index("menu_marquee_reset();"),
+				body.index("me_draw(menu, sel, NULL);"))
 
 	def test_enum_alignment_uses_ten_cell_legacy_rule(self):
 		self.assert_non_sdl_branch(

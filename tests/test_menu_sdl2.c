@@ -243,6 +243,117 @@ static void test_preview_rejects_invalid_geometry(void)
 				      NULL) == -1);
 }
 
+static int rect_has_pixels(const uint16_t *pixels, int pitch,
+			   const struct menu_rect *rect)
+{
+	int x;
+	int y;
+
+	for (y = rect->y; y < rect->y + rect->h; y++)
+		for (x = rect->x; x < rect->x + rect->w; x++)
+			if (pixels[y * pitch + x] != 0)
+				return 1;
+	return 0;
+}
+
+static void draw_marquee_frame(uint16_t *pixels, int width,
+				const struct menu_responsive_layout *layout,
+				unsigned int elapsed_ms)
+{
+	static const char label[] =
+		"\xe6\x97\xa0\xe9\x99\x90\xe6\x8a\x80"
+		"\xe8\x83\xbd\xe7\x82\xb9 Unlimited Skill Points";
+	struct menu_rect clip;
+	int text_x = layout->menu.x + layout->main_font_px * 3;
+	int value_x = layout->menu.x + layout->menu.w -
+		layout->main_font_px * 3;
+	int text_width = menu_sdl2_text_width(MENU_FONT_MAIN, label);
+	int gap_width = layout->main_font_px * 3;
+	int offset;
+	int second_x;
+
+	clip.x = text_x;
+	clip.y = layout->menu.y;
+	clip.w = value_x - layout->main_font_px - text_x;
+	clip.h = menu_sdl2_line_height(MENU_FONT_MAIN);
+	offset = menu_marquee_offset(text_width, clip.w, gap_width, elapsed_ms);
+	assert(menu_sdl2_draw_text_clipped(pixels, width, MENU_FONT_MAIN,
+					   text_x - offset, clip.y, 0xffff,
+					   label, &clip) == 0);
+	second_x = text_x - offset + text_width + gap_width;
+	if (second_x < clip.x + clip.w)
+		assert(menu_sdl2_draw_text_clipped(pixels, width, MENU_FONT_MAIN,
+						   second_x, clip.y, 0xffff,
+						   label, &clip) == 0);
+	assert(menu_sdl2_draw_text(pixels, width, MENU_FONT_MAIN,
+				   value_x, clip.y, 0xffff, "OFF") == 0);
+}
+
+static void test_marquee_clipping_at_resolution(int width, int height)
+{
+	struct menu_responsive_layout layout;
+	struct menu_rect label_rect;
+	struct menu_rect value_rect;
+	struct menu_rect restored_rect;
+	uint16_t *first = calloc((size_t)width * height, sizeof(*first));
+	uint16_t *moving = calloc((size_t)width * height, sizeof(*moving));
+	int label_changed = 0;
+	int x;
+	int y;
+
+	assert(first != NULL && moving != NULL);
+	assert(menu_sdl2_init("skin/picoarch-ui.ttf",
+			      "skin/background.png", width, height) == 0);
+	menu_calculate_responsive_layout(width, height, &layout);
+	assert(layout.show_preview);
+	draw_marquee_frame(first, width, &layout, 0);
+	draw_marquee_frame(moving, width, &layout, 3000);
+
+	label_rect.x = layout.menu.x + layout.main_font_px * 3;
+	label_rect.y = layout.menu.y;
+	label_rect.w = layout.menu.x + layout.menu.w -
+		layout.main_font_px * 4 - label_rect.x;
+	label_rect.h = menu_sdl2_line_height(MENU_FONT_MAIN);
+	for (y = label_rect.y; y < label_rect.y + label_rect.h; y++)
+		for (x = label_rect.x; x < label_rect.x + label_rect.w; x++)
+			if (first[y * width + x] != moving[y * width + x])
+				label_changed = 1;
+	assert(label_changed);
+
+	value_rect.x = layout.menu.x + layout.menu.w -
+		layout.main_font_px * 3;
+	value_rect.y = layout.menu.y;
+	value_rect.w = layout.main_font_px * 3;
+	value_rect.h = menu_sdl2_line_height(MENU_FONT_MAIN);
+	assert(rect_has_pixels(first, width, &value_rect));
+	for (y = value_rect.y; y < value_rect.y + value_rect.h; y++)
+		for (x = value_rect.x; x < value_rect.x + value_rect.w; x++)
+			assert(first[y * width + x] == moving[y * width + x]);
+	assert(!rect_has_pixels(first, width, &layout.preview));
+	assert(!rect_has_pixels(moving, width, &layout.preview));
+
+	restored_rect.x = layout.preview.x;
+	restored_rect.y = layout.preview.y;
+	restored_rect.w = layout.main_font_px * 2;
+	restored_rect.h = menu_sdl2_line_height(MENU_FONT_MAIN);
+	assert(menu_sdl2_draw_text(first, width, MENU_FONT_MAIN,
+				   restored_rect.x, restored_rect.y,
+				   0xffff, "X") == 0);
+	assert(rect_has_pixels(first, width, &restored_rect));
+	assert(menu_sdl2_draw_text_clipped(first, width, MENU_FONT_MAIN,
+					   0, 0, 0xffff, "X", NULL) == -1);
+
+	menu_sdl2_finish();
+	free(first);
+	free(moving);
+}
+
+static void test_text_clipping_stays_inside_menu_column(void)
+{
+	test_marquee_clipping_at_resolution(640, 480);
+	test_marquee_clipping_at_resolution(1280, 720);
+}
+
 int main(void)
 {
 	SDL_setenv("SDL_VIDEODRIVER", "dummy", 1);
@@ -257,6 +368,7 @@ int main(void)
 	test_rejects_overflowing_framebuffer_span();
 	test_preview_is_aspect_fitted_and_respects_pitch();
 	test_preview_rejects_invalid_geometry();
+	test_text_clipping_stays_inside_menu_column();
 
 	TTF_Quit();
 	SDL_Quit();

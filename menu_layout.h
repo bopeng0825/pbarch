@@ -38,6 +38,8 @@ void menu_calculate_responsive_layout(int output_width, int output_height,
 int menu_centered_block_y(int top, int height, int block_height);
 void menu_visible_window(int total, int selected, int capacity,
 			 int *first, int *count);
+int menu_marquee_offset(int text_width, int viewport_width, int gap_width,
+			unsigned int elapsed_ms);
 void menu_aspect_fit(int source_width, int source_height,
 		     const struct menu_rect *bounds, struct menu_rect *fitted);
 

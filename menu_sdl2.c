@@ -352,17 +352,22 @@ int menu_sdl2_draw_preview(uint16_t *destination, int destination_pitch,
 	return 0;
 }
 
-int menu_sdl2_draw_text(uint16_t *pixels, int pitch_pixels,
-			enum menu_font_role role, int x, int y,
-			uint16_t color, const char *utf8)
+static int draw_text(uint16_t *pixels, int pitch_pixels,
+		     enum menu_font_role role, int x, int y,
+		     uint16_t color, const char *utf8,
+		     const struct menu_rect *clip)
 {
 	SDL_Surface *destination;
 	SDL_Surface *rendered;
+	SDL_Rect old_clip;
+	SDL_Rect new_clip;
 	SDL_Rect target;
 	size_t bytes;
 	int cached;
+	int result = 0;
 
-	if (!role_valid(role) || state.fonts[role] == NULL || utf8 == NULL)
+	if (!role_valid(role) || state.fonts[role] == NULL || utf8 == NULL ||
+	    (clip != NULL && (clip->w <= 0 || clip->h <= 0)))
 		return -1;
 	destination = destination_surface(pixels, pitch_pixels);
 	if (destination == NULL)
@@ -388,16 +393,41 @@ int menu_sdl2_draw_text(uint16_t *pixels, int pitch_pixels,
 	target.y = y;
 	target.w = 0;
 	target.h = 0;
+	if (clip != NULL) {
+		SDL_GetClipRect(destination, &old_clip);
+		new_clip.x = clip->x;
+		new_clip.y = clip->y;
+		new_clip.w = clip->w;
+		new_clip.h = clip->h;
+		SDL_SetClipRect(destination, &new_clip);
+	}
 	if (SDL_BlitSurface(rendered, NULL, destination, &target) != 0) {
 		fprintf(stderr, "menu: unable to blit UTF-8 text: %s\n",
 			SDL_GetError());
-		if (!cached)
-			SDL_FreeSurface(rendered);
-		return -1;
+		result = -1;
 	}
+	if (clip != NULL)
+		SDL_SetClipRect(destination, &old_clip);
 	if (!cached)
 		SDL_FreeSurface(rendered);
-	return 0;
+	return result;
+}
+
+int menu_sdl2_draw_text(uint16_t *pixels, int pitch_pixels,
+			enum menu_font_role role, int x, int y,
+			uint16_t color, const char *utf8)
+{
+	return draw_text(pixels, pitch_pixels, role, x, y, color, utf8, NULL);
+}
+
+int menu_sdl2_draw_text_clipped(uint16_t *pixels, int pitch_pixels,
+				enum menu_font_role role, int x, int y,
+				uint16_t color, const char *utf8,
+				const struct menu_rect *clip)
+{
+	if (clip == NULL)
+		return -1;
+	return draw_text(pixels, pitch_pixels, role, x, y, color, utf8, clip);
 }
 
 void menu_sdl2_copy_background(uint16_t *pixels, int pitch_pixels)
