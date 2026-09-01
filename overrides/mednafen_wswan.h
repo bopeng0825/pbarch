@@ -3,7 +3,7 @@
 static const struct core_override_option mednafen_wswan_core_option_overrides[] = {
 	{
 		.key = "wswan_rotate_display",
-		.default_value = "landscape",
+		.default_value = "manual",
 		.blocked = true
 	},
 	{
