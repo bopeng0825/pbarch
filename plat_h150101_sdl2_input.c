@@ -4,6 +4,7 @@
 #include <SDL/SDL.h>
 #include "libpicofe/input.h"
 #include "main.h"
+#include "plat.h"
 #include "plat_h150101_sdl2_config.h"
 #include "plat_h150101_sdl2_input.h"
 
@@ -291,6 +292,7 @@ static int h150101_sdl2_update(void *drv_data, const int *binds, int *result)
 	struct h150101_sdl2_state *state = drv_data;
 	int i, b;
 
+	plat_discard_pending_input();
 	poll_events(state);
 	SDL_JoystickUpdate();
 
@@ -344,6 +346,7 @@ static int h150101_sdl2_update_keycode(void *drv_data, int *is_down)
 	int i, skipped_count = 0;
 	int key = -1;
 
+	plat_discard_pending_input();
 	SDL_PumpEvents();
 
 	while (SDL_PollEvent(&event)) {

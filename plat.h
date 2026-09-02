@@ -12,6 +12,8 @@ int  plat_init(void);
 int  plat_reinit(void);
 void plat_finish(void);
 void plat_minimize(void);
+void plat_input_resume_notify(void);
+void plat_discard_pending_input(void);
 
 void *plat_prepare_screenshot(int *w, int *h, int *bpp);
 int plat_dump_screen(const char *filename);

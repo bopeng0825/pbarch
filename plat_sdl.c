@@ -1,5 +1,6 @@
 #include <SDL/SDL.h>
 #include <math.h>
+#include <signal.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
@@ -92,6 +93,7 @@ struct audio_state {
 };
 
 struct audio_state audio;
+static volatile sig_atomic_t input_resume_requested;
 
 static void plat_sound_select_resampler(void);
 void (*plat_sound_write)(const struct audio_frame *data, int frames);
@@ -1531,6 +1533,24 @@ static void plat_sound_select_resampler(void)
 
 void plat_sdl_event_handler(void *event_)
 {
+}
+
+void plat_input_resume_notify(void)
+{
+	input_resume_requested = 1;
+}
+
+void plat_discard_pending_input(void)
+{
+	if (!input_resume_requested)
+		return;
+	input_resume_requested = 0;
+
+#ifdef USE_SDL2
+	SDL_PumpEvents();
+	SDL_FlushEvents(SDL_KEYDOWN, SDL_KEYUP);
+	SDL_FlushEvents(SDL_JOYAXISMOTION, SDL_JOYDEVICEREMOVED);
+#endif
 }
 
 int plat_init(void)

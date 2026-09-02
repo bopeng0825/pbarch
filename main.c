@@ -129,10 +129,19 @@ static void handle_signal_quit(int sig)
 	should_quit = true;
 }
 
+static void handle_signal_cont(int sig)
+{
+	(void)sig;
+	plat_input_resume_notify();
+}
+
 static void install_signal_handlers(void)
 {
 	signal(SIGINT, handle_signal_quit);
 	signal(SIGTERM, handle_signal_quit);
+#ifdef SIGCONT
+	signal(SIGCONT, handle_signal_cont);
+#endif
 }
 
 static void toggle_fast_forward(int force_off)
