@@ -110,6 +110,13 @@ static void test_marquee_offset_pauses_scrolls_and_wraps(void)
 	assert(menu_marquee_offset(300, 180, 20, cycle_ms) == 0);
 }
 
+static void test_value_column_uses_measured_width(void)
+{
+	assert(menu_value_column_x(80, 220, 248, 67) == 181);
+	assert(menu_value_column_x(80, 160, 248, 67) == 160);
+	assert(menu_value_column_x(200, 220, 248, 67) == 200);
+}
+
 static void test_utf8_cell_widths(void)
 {
 	assert(menu_utf8_cells("ABC") == 3);
@@ -214,6 +221,7 @@ int main(void)
 	test_responsive_geometry();
 	test_visible_window_keeps_selection_on_screen();
 	test_marquee_offset_pauses_scrolls_and_wraps();
+	test_value_column_uses_measured_width();
 	test_utf8_cell_widths();
 	test_utf8_truncation();
 	test_utf8_truncation_small_destinations();

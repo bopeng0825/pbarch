@@ -9,6 +9,9 @@ MENU_SOURCE = (
 CHEAT_SOURCE = (
 	Path(__file__).resolve().parents[1] / "cheat.c"
 ).read_text(encoding="utf-8")
+INPUT_SOURCE = (
+	Path(__file__).resolve().parents[1] / "libpicofe" / "input.c"
+).read_text(encoding="utf-8")
 
 
 class LegacyMenuGeometryTest(unittest.TestCase):
@@ -77,6 +80,34 @@ class LegacyMenuGeometryTest(unittest.TestCase):
 		body = loop.group("body")
 		self.assertLess(body.index("menu_marquee_reset();"),
 				body.index("me_draw(menu, sel, NULL);"))
+
+	def test_sdl2_menu_wait_returns_for_animation_frames(self):
+		loop = re.search(
+			r"static int me_loop_d\(.*?\)\s*\{(?P<body>.*?)"
+			r"\n\}\n\nstatic int me_loop",
+			MENU_SOURCE,
+			re.DOTALL,
+		)
+		self.assertIsNotNone(loop)
+		self.assertRegex(
+			loop.group("body"),
+			re.compile(
+				r"#ifdef USE_SDL2\s+if \(marquee_active\)\s+"
+				r"inp = in_menu_wait_with_callback\(.*?NULL, 70, 70,\s+"
+				r"menu_idle_redraw, &redraw\);.*?"
+				r"#else\s+inp = in_menu_wait\(.*?, NULL, 70\);\s+#endif",
+				re.DOTALL,
+			),
+		)
+		wait = re.search(
+			r"static int in_menu_wait_any_with_callback\(.*?\)\s*"
+			r"\{(?P<body>.*?)\n\}",
+			INPUT_SOURCE,
+			re.DOTALL,
+		)
+		self.assertIsNotNone(wait)
+		self.assertIn("redraw(redraw_data);", wait.group("body"))
+		self.assertIn("ret != menu_key_prev", wait.group("body"))
 
 	def test_enum_alignment_uses_ten_cell_legacy_rule(self):
 		self.assert_non_sdl_branch(

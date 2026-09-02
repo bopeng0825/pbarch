@@ -235,6 +235,23 @@ int menu_marquee_offset(int text_width, int viewport_width, int gap_width,
 	return (int)offset;
 }
 
+int menu_value_column_x(int text_x, int preferred_x, int menu_right,
+			int value_width)
+{
+	int rightmost;
+
+	if (value_width < 0)
+		value_width = 0;
+	rightmost = menu_right - value_width;
+	if (rightmost < text_x)
+		rightmost = text_x;
+	if (preferred_x > rightmost)
+		preferred_x = rightmost;
+	if (preferred_x < text_x)
+		preferred_x = text_x;
+	return preferred_x;
+}
+
 void menu_aspect_fit(int source_width, int source_height,
 		     const struct menu_rect *bounds, struct menu_rect *fitted)
 {

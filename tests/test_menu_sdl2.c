@@ -256,6 +256,20 @@ static int rect_has_pixels(const uint16_t *pixels, int pitch,
 	return 0;
 }
 
+static int test_value_x(const struct menu_responsive_layout *layout)
+{
+	int m_width = menu_sdl2_text_width(MENU_FONT_MAIN, "M");
+	int text_x = layout->menu.x + m_width * 3;
+	int value_width = menu_sdl2_text_width(MENU_FONT_MAIN, "OFF");
+	int value_reserve = m_width * 3;
+	int measured_reserve = value_width + m_width / 2;
+
+	if (measured_reserve > value_reserve)
+		value_reserve = measured_reserve;
+	return menu_value_column_x(text_x, layout->menu.x + layout->menu.w,
+		layout->menu.x + layout->menu.w, value_reserve);
+}
+
 static void draw_marquee_frame(uint16_t *pixels, int width,
 				const struct menu_responsive_layout *layout,
 				unsigned int elapsed_ms)
@@ -264,17 +278,17 @@ static void draw_marquee_frame(uint16_t *pixels, int width,
 		"\xe6\x97\xa0\xe9\x99\x90\xe6\x8a\x80"
 		"\xe8\x83\xbd\xe7\x82\xb9 Unlimited Skill Points";
 	struct menu_rect clip;
-	int text_x = layout->menu.x + layout->main_font_px * 3;
-	int value_x = layout->menu.x + layout->menu.w -
-		layout->main_font_px * 3;
+	int m_width = menu_sdl2_text_width(MENU_FONT_MAIN, "M");
+	int text_x = layout->menu.x + m_width * 3;
+	int value_x = test_value_x(layout);
 	int text_width = menu_sdl2_text_width(MENU_FONT_MAIN, label);
-	int gap_width = layout->main_font_px * 3;
+	int gap_width = m_width * 3;
 	int offset;
 	int second_x;
 
 	clip.x = text_x;
 	clip.y = layout->menu.y;
-	clip.w = value_x - layout->main_font_px - text_x;
+	clip.w = value_x - m_width - text_x;
 	clip.h = menu_sdl2_line_height(MENU_FONT_MAIN);
 	offset = menu_marquee_offset(text_width, clip.w, gap_width, elapsed_ms);
 	assert(menu_sdl2_draw_text_clipped(pixels, width, MENU_FONT_MAIN,
@@ -297,6 +311,7 @@ static void test_marquee_clipping_at_resolution(int width, int height)
 	struct menu_rect restored_rect;
 	uint16_t *first = calloc((size_t)width * height, sizeof(*first));
 	uint16_t *moving = calloc((size_t)width * height, sizeof(*moving));
+	int m_width;
 	int label_changed = 0;
 	int x;
 	int y;
@@ -306,13 +321,14 @@ static void test_marquee_clipping_at_resolution(int width, int height)
 			      "skin/background.png", width, height) == 0);
 	menu_calculate_responsive_layout(width, height, &layout);
 	assert(layout.show_preview);
+	m_width = menu_sdl2_text_width(MENU_FONT_MAIN, "M");
 	draw_marquee_frame(first, width, &layout, 0);
 	draw_marquee_frame(moving, width, &layout, 3000);
 
-	label_rect.x = layout.menu.x + layout.main_font_px * 3;
+	label_rect.x = layout.menu.x + m_width * 3;
 	label_rect.y = layout.menu.y;
-	label_rect.w = layout.menu.x + layout.menu.w -
-		layout.main_font_px * 4 - label_rect.x;
+	label_rect.w = test_value_x(&layout) - m_width -
+		label_rect.x;
 	label_rect.h = menu_sdl2_line_height(MENU_FONT_MAIN);
 	for (y = label_rect.y; y < label_rect.y + label_rect.h; y++)
 		for (x = label_rect.x; x < label_rect.x + label_rect.w; x++)
@@ -320,11 +336,11 @@ static void test_marquee_clipping_at_resolution(int width, int height)
 				label_changed = 1;
 	assert(label_changed);
 
-	value_rect.x = layout.menu.x + layout.menu.w -
-		layout.main_font_px * 3;
+	value_rect.x = test_value_x(&layout);
 	value_rect.y = layout.menu.y;
-	value_rect.w = layout.main_font_px * 3;
+	value_rect.w = layout.menu.x + layout.menu.w - value_rect.x;
 	value_rect.h = menu_sdl2_line_height(MENU_FONT_MAIN);
+	assert(menu_sdl2_text_width(MENU_FONT_MAIN, "OFF") <= value_rect.w);
 	assert(rect_has_pixels(first, width, &value_rect));
 	for (y = value_rect.y; y < value_rect.y + value_rect.h; y++)
 		for (x = value_rect.x; x < value_rect.x + value_rect.w; x++)
