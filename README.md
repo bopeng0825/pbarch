@@ -52,7 +52,8 @@ The effective order is `--language CODE`, then `~/.picoarch/ui.cfg`, then
 English. Translation covers picoarch's frontend menu. Options and help text
 provided by a libretro core are displayed unchanged.
 
-SDL2 builds use the files in `skin/` for the menu font and background.
+SDL2 builds use the files in `skin/` for the menu font, background, and flat
+text/selection colors.
 H150101 currently has no package target, so direct deployments must copy the
 complete `skin/` directory beside `picoarch`; the runtime platform glue
 resolves that installed skin location with `plat_get_skin_dir()`.

@@ -6,6 +6,14 @@ from tools import gen_ui_catalog
 
 
 class CatalogValidationTest(unittest.TestCase):
+	def test_main_menu_title_has_all_supported_translations(self):
+		rows = {row[0]: row[1:] for row in gen_ui_catalog.read_catalog()}
+		self.assertIn("game_menu", rows)
+		self.assertEqual(
+			rows["game_menu"],
+			["Game menu", "游戏菜单", "遊戲選單"],
+		)
+
 	def assert_valid_translation(self, english, translation):
 		with tempfile.TemporaryDirectory() as directory:
 			source = Path(directory) / "ui.tsv"

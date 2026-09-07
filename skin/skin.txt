@@ -1,0 +1,3 @@
+# Flat RGB colors used by the low-cost menu renderer.
+text_color=d8ddd8
+selection_color=245b8c

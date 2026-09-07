@@ -11,6 +11,7 @@ enum ui_language {
 enum ui_text_id {
 	UI_TEXT_ON = 0,
 	UI_TEXT_OFF,
+	UI_TEXT_GAME_MENU,
 	UI_TEXT_RESUME_GAME,
 	UI_TEXT_SAVE_STATE,
 	UI_TEXT_LOAD_STATE,

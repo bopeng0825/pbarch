@@ -13,6 +13,7 @@
 #include "text_cache.h"
 
 #define MENU_MAX_DIMENSION 8192
+#define MENU_SDL2_SHADOW_COLOR 0x0000
 
 #ifdef MENU_SDL2_TEST_ALLOC
 static int allocations_before_failure = -1;
@@ -417,6 +418,12 @@ int menu_sdl2_draw_text(uint16_t *pixels, int pitch_pixels,
 			enum menu_font_role role, int x, int y,
 			uint16_t color, const char *utf8)
 {
+	int result;
+
+	result = draw_text(pixels, pitch_pixels, role, x + 1, y + 1,
+			   MENU_SDL2_SHADOW_COLOR, utf8, NULL);
+	if (result != 0)
+		return result;
 	return draw_text(pixels, pitch_pixels, role, x, y, color, utf8, NULL);
 }
 
@@ -426,6 +433,9 @@ int menu_sdl2_draw_text_clipped(uint16_t *pixels, int pitch_pixels,
 				const struct menu_rect *clip)
 {
 	if (clip == NULL)
+		return -1;
+	if (draw_text(pixels, pitch_pixels, role, x + 1, y + 1,
+		      MENU_SDL2_SHADOW_COLOR, utf8, clip) != 0)
 		return -1;
 	return draw_text(pixels, pitch_pixels, role, x, y, color, utf8, clip);
 }

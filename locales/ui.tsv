@@ -1,6 +1,7 @@
 key	en	zh_CN	zh_TW
 on	ON	开	開
 off	OFF	关	關
+game_menu	Game menu	游戏菜单	遊戲選單
 resume_game	Resume game	继续游戏	繼續遊戲
 save_state	Save state	保存状态	儲存狀態
 load_state	Load state	读取状态	載入狀態

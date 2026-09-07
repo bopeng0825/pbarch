@@ -947,6 +947,18 @@ static menu_entry e_menu_main[] =
 	mee_end,
 };
 
+#ifdef USE_SDL2
+static void draw_main_menu_decor(void)
+{
+	struct menu_responsive_layout layout;
+
+	if (!menu_get_responsive_layout(&layout))
+		return;
+	text_out16(layout.menu.x + me_mfont_w * 3, layout.menu.y,
+		   "%s", ui_text(UI_TEXT_GAME_MENU));
+}
+#endif
+
 void menu_set_full_menu(int enabled)
 {
 	full_menu_enabled = enabled != 0;
@@ -1031,7 +1043,11 @@ void menu_loop(void)
 		me_enable(e_menu_main, MA_MAIN_LOAD_STATE, mmenu == NULL);
 	}
 #endif
+#ifdef USE_SDL2
+	me_loop_d(e_menu_main, &sel, NULL, draw_main_menu_decor);
+#else
 	me_loop(e_menu_main, &sel);
+#endif
 
 	/* wait until menu, ok, back is released */
 	while (in_menu_wait_any(NULL, 50) & (PBTN_MENU|PBTN_MOK|PBTN_MBACK))

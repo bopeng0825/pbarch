@@ -5,6 +5,7 @@
 static const char *const ui_catalog[UI_TEXT_COUNT][UI_LANG_COUNT] = {
 	[UI_TEXT_ON] = { "ON", "开", "開" },
 	[UI_TEXT_OFF] = { "OFF", "关", "關" },
+	[UI_TEXT_GAME_MENU] = { "Game menu", "游戏菜单", "遊戲選單" },
 	[UI_TEXT_RESUME_GAME] = { "Resume game", "继续游戏", "繼續遊戲" },
 	[UI_TEXT_SAVE_STATE] = { "Save state", "保存状态", "儲存狀態" },
 	[UI_TEXT_LOAD_STATE] = { "Load state", "读取状态", "載入狀態" },

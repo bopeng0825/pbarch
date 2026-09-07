@@ -66,7 +66,7 @@ static void test_valid_renderer(void)
 	assert(menu_sdl2_draw_text(pixels, 640, MENU_FONT_MAIN, 0, 0,
 				   0xffff, "Options") == 0);
 	entries = menu_sdl2_cache_entries();
-	assert(entries == 1);
+	assert(entries == 2);
 	assert(menu_sdl2_draw_text(pixels, 640, MENU_FONT_MAIN, 0, 0,
 				   0xffff, "Options") == 0);
 	assert(menu_sdl2_cache_entries() == entries);

@@ -6,6 +6,12 @@ from pathlib import Path
 MENU_SOURCE = (
 	Path(__file__).resolve().parents[1] / "libpicofe" / "menu.c"
 ).read_text(encoding="utf-8")
+FRONTEND_MENU_SOURCE = (
+	Path(__file__).resolve().parents[1] / "menu.c"
+).read_text(encoding="utf-8")
+SDL2_MENU_SOURCE = (
+	Path(__file__).resolve().parents[1] / "menu_sdl2.c"
+).read_text(encoding="utf-8")
 CHEAT_SOURCE = (
 	Path(__file__).resolve().parents[1] / "cheat.c"
 ).read_text(encoding="utf-8")
@@ -58,6 +64,41 @@ class LegacyMenuGeometryTest(unittest.TestCase):
 			draw_body.index("menu_draw_begin(1, 0);"),
 			draw_body.index("menu_get_responsive_layout(&layout);"),
 		)
+
+	def test_sdl2_main_menu_draws_translated_header(self):
+		self.assertRegex(
+			FRONTEND_MENU_SOURCE,
+			re.compile(
+				r"static void draw_main_menu_decor\(void\).*?"
+				r"ui_text\(UI_TEXT_GAME_MENU\)",
+				re.DOTALL,
+			),
+		)
+
+	def test_sdl2_ttf_text_draws_shadow_before_foreground(self):
+		text_draw = re.search(
+			r"int menu_sdl2_draw_text\(.*?\)\s*\{(?P<body>.*?)"
+			r"\n\}",
+			SDL2_MENU_SOURCE,
+			re.DOTALL,
+		)
+		self.assertIsNotNone(text_draw)
+		body = text_draw.group("body")
+		self.assertIn("MENU_SDL2_SHADOW_COLOR", body)
+		self.assertLess(
+			body.index("MENU_SDL2_SHADOW_COLOR"),
+			body.index("color, utf8"),
+		)
+
+	def test_sdl2_selection_uses_flat_solid_color(self):
+		skin = Path(__file__).resolve().parents[1] / "skin" / "skin.txt"
+		self.assertTrue(skin.is_file())
+		settings = dict(
+			line.split("=", 1)
+			for line in skin.read_text(encoding="ascii").splitlines()
+			if line and not line.startswith("#")
+		)
+		self.assertEqual(settings["selection_color"], "245b8c")
 
 	def test_sdl2_cheat_descriptions_are_not_byte_truncated(self):
 		self.assertRegex(
