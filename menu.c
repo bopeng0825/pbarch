@@ -19,7 +19,7 @@
 
 #define PXMAKE(r,g,b) ((((r)<<8) & 0xf800)|(((g)<<3) & 0x07e0)|((b)>>3))
 #define MENU_STYLE_SELECTION PXMAKE(0x72, 0xa6, 0xce)
-#define MENU_STYLE_SELECTED_TEXT PXMAKE(0x10, 0x28, 0x38)
+#define MENU_STYLE_SELECTED_TEXT PXMAKE(0x08, 0x18, 0x20)
 #define MENU_STYLE_TITLE PXMAKE(0xe4, 0xe7, 0xe9)
 
 static int drew_alt_bg = 0;
@@ -1029,9 +1029,14 @@ static int draw_main_menu_styled(int selected_index)
 		color = i == selected_index ? MENU_STYLE_SELECTED_TEXT :
 			menu_text_color;
 		clip.y = row_y;
-		menu_sdl2_draw_text_clipped(g_menuscreen_ptr, g_menuscreen_pp,
-					    MENU_FONT_MAIN, geometry.text_x, text_y,
-					    color, name, &clip);
+		if (i == selected_index)
+			menu_sdl2_draw_text_clipped_unshadowed(
+				g_menuscreen_ptr, g_menuscreen_pp, MENU_FONT_MAIN,
+				geometry.text_x, text_y, color, name, &clip);
+		else
+			menu_sdl2_draw_text_clipped(
+				g_menuscreen_ptr, g_menuscreen_pp, MENU_FONT_MAIN,
+				geometry.text_x, text_y, color, name, &clip);
 	}
 	if (menu_error_msg[0] != 0) {
 		clip.x = layout.outer_margin;
@@ -1177,9 +1182,14 @@ static int draw_savestate_menu_styled(int menu_sel, int is_loading)
 			snprintf(row, sizeof(row), "%s", menu_translate(UI_TEXT_BACK));
 
 		clip.y = row_y;
-		menu_sdl2_draw_text_clipped(g_menuscreen_ptr, g_menuscreen_pp,
-					    MENU_FONT_MAIN, geometry.text_x, text_y,
-					    color, row, &clip);
+		if (i == menu_sel)
+			menu_sdl2_draw_text_clipped_unshadowed(
+				g_menuscreen_ptr, g_menuscreen_pp, MENU_FONT_MAIN,
+				geometry.text_x, text_y, color, row, &clip);
+		else
+			menu_sdl2_draw_text_clipped(
+				g_menuscreen_ptr, g_menuscreen_pp, MENU_FONT_MAIN,
+				geometry.text_x, text_y, color, row, &clip);
 	}
 	menu_draw_end();
 	return 1;

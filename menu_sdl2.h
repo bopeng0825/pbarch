@@ -40,6 +40,12 @@ int menu_sdl2_draw_text_clipped(uint16_t *pixels, int pitch_pixels,
 				enum menu_font_role role, int x, int y,
 				uint16_t color, const char *utf8,
 				const struct menu_rect *clip);
+int menu_sdl2_draw_text_clipped_unshadowed(uint16_t *pixels,
+					   int pitch_pixels,
+					   enum menu_font_role role,
+					   int x, int y, uint16_t color,
+					   const char *utf8,
+					   const struct menu_rect *clip);
 void menu_sdl2_copy_background(uint16_t *pixels, int pitch_pixels);
 size_t menu_sdl2_cache_entries(void);
 void menu_sdl2_clear_cache(void);

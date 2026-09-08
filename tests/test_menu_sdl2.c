@@ -97,6 +97,39 @@ static void test_valid_renderer(void)
 	menu_sdl2_finish();
 }
 
+static void test_unshadowed_text_omits_shadow_pixels(void)
+{
+	uint16_t shadowed[160 * 80];
+	uint16_t unshadowed[160 * 80];
+	struct menu_rect clip = { 0, 0, 160, 80 };
+	const uint16_t background = 0x7bef;
+	int foreground_pixels = 0;
+	int shadow_only_pixels = 0;
+	int i;
+
+	for (i = 0; i < 160 * 80; i++) {
+		shadowed[i] = background;
+		unshadowed[i] = background;
+	}
+	assert(menu_sdl2_init("skin/picoarch-ui.ttf",
+			      "skin/background.png", 160, 80) == 0);
+	assert(menu_sdl2_draw_text(shadowed, 160, MENU_FONT_MAIN,
+				   10, 10, 0xffff, "Selected") == 0);
+	assert(menu_sdl2_draw_text_clipped_unshadowed(unshadowed, 160,
+						      MENU_FONT_MAIN, 10, 10,
+						      0xffff, "Selected",
+						      &clip) == 0);
+	for (i = 0; i < 160 * 80; i++) {
+		if (unshadowed[i] != background)
+			foreground_pixels++;
+		if (unshadowed[i] == background && shadowed[i] != background)
+			shadow_only_pixels++;
+	}
+	assert(foreground_pixels > 0);
+	assert(shadow_only_pixels > 0);
+	menu_sdl2_finish();
+}
+
 static void test_rgb_and_rgba_background_scaling(void)
 {
 	static const unsigned char rgb[] = {
@@ -380,6 +413,7 @@ int main(void)
 	assert(TTF_Init() == 0);
 
 	test_valid_renderer();
+	test_unshadowed_text_omits_shadow_pixels();
 	test_rgb_and_rgba_background_scaling();
 	test_missing_background();
 	test_missing_font();

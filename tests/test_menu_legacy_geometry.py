@@ -128,10 +128,22 @@ class LegacyMenuGeometryTest(unittest.TestCase):
 		)
 
 	def test_styled_menu_uses_reference_spacing_and_lower_list_origin(self):
-		self.assertIn("spacing = font_px / 2;", MENU_LAYOUT_SOURCE)
+		self.assertIn("spacing = (font_px * 3 + 2) / 5;", MENU_LAYOUT_SOURCE)
 		self.assertIn(
 			"title_height + 3 * line_height / 4",
 			MENU_STYLE_SOURCE,
+		)
+
+	def test_selected_text_uses_unshadowed_renderer(self):
+		self.assertIn(
+			"int menu_sdl2_draw_text_clipped_unshadowed(",
+			SDL2_MENU_SOURCE,
+		)
+		self.assertGreaterEqual(
+			FRONTEND_MENU_SOURCE.count(
+				"menu_sdl2_draw_text_clipped_unshadowed("
+			),
+			2,
 		)
 
 	def test_styled_menu_centers_body_text_and_keeps_title_regular(self):

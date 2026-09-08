@@ -127,7 +127,7 @@ int menu_spaced_line_height(int font_line_height, int font_px)
 
 	if (font_line_height <= 0)
 		return 0;
-	spacing = font_px / 2;
+	spacing = (font_px * 3 + 2) / 5;
 	if (spacing < 1)
 		spacing = 1;
 	return font_line_height + spacing;

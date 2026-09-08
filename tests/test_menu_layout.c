@@ -25,6 +25,8 @@ static void test_font_sizes(void)
 	assert(menu_main_font_px(1080) == 32);
 	assert(menu_main_font_px(INT_MAX) == 32);
 	assert(menu_small_font_px(20) == 16);
+	assert(menu_spaced_line_height(24, 20) == 36);
+	assert(menu_spaced_line_height(36, 30) == 54);
 }
 
 static void test_responsive_geometry(void)
