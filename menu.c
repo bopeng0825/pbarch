@@ -1319,8 +1319,9 @@ static int draw_savestate_menu_styled(int menu_sel, int is_loading)
 	struct menu_style_geometry geometry;
 	struct menu_rect clip;
 	char row[96];
-	char time_buf[32];
 	const char *title;
+	const char *empty_text = menu_translate(UI_TEXT_SLOT_EMPTY);
+	const char *saved_text = menu_translate(UI_TEXT_SLOT_SAVED);
 	int text_height;
 	int title_height;
 	int first;
@@ -1367,20 +1368,10 @@ static int draw_savestate_menu_styled(int menu_sel, int is_loading)
 			menu_text_color;
 
 		if (i < STATE_SLOT_COUNT) {
-			if (!(state_slot_flags & (1 << i)))
-				strcpy(time_buf, "free");
-			else {
-				strcpy(time_buf, "USED");
-				if (state_slot_times[i] != 0) {
-					time_t time = state_slot_times[i];
-					struct tm *stamp = localtime(&time);
-
-					strftime(time_buf, sizeof(time_buf), "%x %R",
-						 stamp);
-				}
-			}
+			const char *status = state_slot_flags & (1 << i) ?
+				saved_text : empty_text;
 			snprintf(row, sizeof(row), menu_translate(UI_TEXT_SLOT_FMT),
-				 i, time_buf);
+				 i, status);
 		}
 		else
 			snprintf(row, sizeof(row), "%s", menu_translate(UI_TEXT_BACK));

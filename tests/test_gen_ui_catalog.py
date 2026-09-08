@@ -14,6 +14,14 @@ class CatalogValidationTest(unittest.TestCase):
 			["Game menu", "游戏菜单", "遊戲選單"],
 		)
 
+	def test_savestate_usage_has_all_supported_translations(self):
+		rows = {row[0]: row[1:] for row in gen_ui_catalog.read_catalog()}
+		self.assertEqual(rows["slot_empty"], ["Empty", "空", "空"])
+		self.assertEqual(
+			rows["slot_saved"],
+			["Saved", "已保存", "已儲存"],
+		)
+
 	def assert_valid_translation(self, english, translation):
 		with tempfile.TemporaryDirectory() as directory:
 			source = Path(directory) / "ui.tsv"

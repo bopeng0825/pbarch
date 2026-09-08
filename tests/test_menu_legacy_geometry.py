@@ -130,6 +130,16 @@ class LegacyMenuGeometryTest(unittest.TestCase):
 	def test_savestate_menu_exposes_eight_slots(self):
 		self.assertIn("#define STATE_SLOT_COUNT 8", MENU_SOURCE)
 
+	def test_savestate_usage_is_translated_without_timestamps(self):
+		self.assertIn("UI_TEXT_SLOT_EMPTY", MENU_SOURCE)
+		self.assertIn("UI_TEXT_SLOT_SAVED", MENU_SOURCE)
+		self.assertIn("UI_TEXT_SLOT_EMPTY", FRONTEND_MENU_SOURCE)
+		self.assertIn("UI_TEXT_SLOT_SAVED", FRONTEND_MENU_SOURCE)
+		self.assertNotIn('strcpy(time_buf, "free")', MENU_SOURCE)
+		self.assertNotIn("strftime(time_buf", MENU_SOURCE)
+		self.assertNotIn('strcpy(time_buf, "free")', FRONTEND_MENU_SOURCE)
+		self.assertNotIn("strftime(time_buf", FRONTEND_MENU_SOURCE)
+
 	def test_cheat_menu_uses_styled_columns_and_marquee(self):
 		self.assertIn("draw_cheats_menu_styled(", FRONTEND_MENU_SOURCE)
 		self.assertIn("menu_loop_cheats_styled(", FRONTEND_MENU_SOURCE)
