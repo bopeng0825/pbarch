@@ -147,6 +147,19 @@ class LegacyMenuGeometryTest(unittest.TestCase):
 		self.assertIn("menu_style_option_columns(", FRONTEND_MENU_SOURCE)
 		self.assertIn("menu_marquee_offset(", FRONTEND_MENU_SOURCE)
 
+	def test_cheat_menu_redraws_while_waiting_for_input(self):
+		loop = re.search(
+			r"static int menu_loop_cheats_styled\(.*?\)\s*"
+			r"\{(?P<body>.*?)\n\}",
+			FRONTEND_MENU_SOURCE,
+			re.DOTALL,
+		)
+		self.assertIsNotNone(loop)
+		body = loop.group("body")
+		self.assertIn("in_menu_wait_with_callback(", body)
+		self.assertIn("draw_cheats_menu_idle", body)
+		self.assertNotIn("inp = in_menu_wait(", body)
+
 	def test_styled_menu_uses_reference_spacing_and_lower_list_origin(self):
 		self.assertIn("spacing = (font_px * 3 + 2) / 5;", MENU_LAYOUT_SOURCE)
 		self.assertIn(

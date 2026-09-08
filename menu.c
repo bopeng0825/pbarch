@@ -632,6 +632,21 @@ static int draw_cheats_menu_styled(menu_entry *entries, int sel,
 	return 1;
 }
 
+struct cheats_menu_redraw {
+	menu_entry *entries;
+	int sel;
+	unsigned int selected_since;
+	int draw_ok;
+};
+
+static void draw_cheats_menu_idle(void *data)
+{
+	struct cheats_menu_redraw *redraw = data;
+
+	redraw->draw_ok = draw_cheats_menu_styled(redraw->entries, redraw->sel,
+		plat_get_ticks_ms() - redraw->selected_since);
+}
+
 static int menu_loop_cheats_styled(menu_entry *entries, int *menu_sel)
 {
 	unsigned int selected_since = plat_get_ticks_ms();
@@ -652,14 +667,23 @@ static int menu_loop_cheats_styled(menu_entry *entries, int *menu_sel)
 	       (PBTN_MOK|PBTN_MBACK|PBTN_MENU))
 		;
 	for (;;) {
+		struct cheats_menu_redraw redraw = {
+			.entries = entries,
+			.sel = sel,
+			.selected_since = selected_since,
+			.draw_ok = 1,
+		};
 		int old_sel = sel;
 
 		if (!draw_cheats_menu_styled(entries, sel,
 				plat_get_ticks_ms() - selected_since))
 			return -1;
-		inp = in_menu_wait(PBTN_UP|PBTN_DOWN|PBTN_LEFT|PBTN_RIGHT|
+		inp = in_menu_wait_with_callback(
+			PBTN_UP|PBTN_DOWN|PBTN_LEFT|PBTN_RIGHT|
 			PBTN_MOK|PBTN_MBACK|PBTN_MENU|PBTN_L|PBTN_R,
-			NULL, 70);
+			NULL, 70, 33, draw_cheats_menu_idle, &redraw);
+		if (!redraw.draw_ok)
+			return -1;
 		if (inp & (PBTN_MENU|PBTN_MBACK))
 			break;
 		if (inp & PBTN_UP) {
