@@ -507,6 +507,203 @@ static int menu_loop_disc(int id, int keys)
 	return 0;
 }
 
+#ifdef USE_SDL2
+static void draw_cheat_name_styled(const char *name, int selected,
+				   int x, int y, int row_y,
+				   int clip_right, unsigned int elapsed_ms)
+{
+	struct menu_rect clip;
+	int color = selected ? MENU_STYLE_SELECTED_TEXT : menu_text_color;
+	int viewport_width = clip_right - x;
+	int text_width;
+	int offset;
+	int second_x;
+
+	if (name == NULL || viewport_width <= 0)
+		return;
+	clip.x = x;
+	clip.y = row_y;
+	clip.w = viewport_width;
+	clip.h = me_mfont_h;
+	text_width = menu_sdl2_text_width(MENU_FONT_MAIN, name);
+	if (!selected || text_width <= viewport_width) {
+		if (selected)
+			menu_sdl2_draw_text_clipped_unshadowed(
+				g_menuscreen_ptr, g_menuscreen_pp, MENU_FONT_MAIN,
+				x, y, color, name, &clip);
+		else
+			menu_sdl2_draw_text_clipped(
+				g_menuscreen_ptr, g_menuscreen_pp, MENU_FONT_MAIN,
+				x, y, color, name, &clip);
+		return;
+	}
+
+	offset = menu_marquee_offset(text_width, viewport_width,
+				      me_mfont_w * 3, elapsed_ms);
+	menu_sdl2_draw_text_clipped_unshadowed(
+		g_menuscreen_ptr, g_menuscreen_pp, MENU_FONT_MAIN,
+		x - offset, y, color, name, &clip);
+	second_x = x - offset + text_width + me_mfont_w * 3;
+	if (second_x < clip_right)
+		menu_sdl2_draw_text_clipped_unshadowed(
+			g_menuscreen_ptr, g_menuscreen_pp, MENU_FONT_MAIN,
+			second_x, y, color, name, &clip);
+}
+
+static int draw_cheats_menu_styled(menu_entry *entries, int sel,
+				    unsigned int elapsed_ms)
+{
+	struct menu_responsive_layout layout;
+	struct menu_style_geometry geometry;
+	struct menu_style_option_columns columns;
+	struct menu_rect value_clip;
+	const char *on_text = ui_text(UI_TEXT_ON);
+	const char *off_text = ui_text(UI_TEXT_OFF);
+	int value_width = menu_sdl2_text_width(MENU_FONT_MAIN, on_text);
+	int off_width = menu_sdl2_text_width(MENU_FONT_MAIN, off_text);
+	int text_height;
+	int title_height;
+	int selection_right;
+	int count = me_count(entries);
+	int first;
+	int end;
+	int i;
+
+	if (off_width > value_width)
+		value_width = off_width;
+	menu_draw_begin(1, 1);
+	if (!menu_get_responsive_layout(&layout) || count <= 0 ||
+	    sel < 0 || sel >= count) {
+		menu_draw_end();
+		return 0;
+	}
+	text_height = menu_sdl2_font_height(MENU_FONT_MAIN);
+	title_height = menu_sdl2_line_height(MENU_FONT_TITLE);
+	if (!menu_style_main_geometry(&layout, me_mfont_h, text_height,
+				      title_height, me_mfont_w, count, sel,
+				      &geometry) ||
+	    !menu_style_option_columns(&geometry, me_mfont_w, value_width,
+				       &columns)) {
+		menu_draw_end();
+		return 0;
+	}
+	selection_right = geometry.selection.x + geometry.selection.w;
+	menu_style_draw_selection(g_menuscreen_ptr, g_menuscreen_w,
+				  g_menuscreen_h, g_menuscreen_pp,
+				  &geometry.selection, MENU_STYLE_SELECTION);
+	menu_sdl2_draw_text(g_menuscreen_ptr, g_menuscreen_pp,
+			   MENU_FONT_TITLE, geometry.title_x, geometry.title_y,
+			   MENU_STYLE_TITLE, ui_text(UI_TEXT_CHEATS));
+
+	value_clip.x = columns.value_x;
+	value_clip.w = selection_right - me_mfont_w - value_clip.x;
+	value_clip.h = me_mfont_h;
+	first = geometry.first_visible;
+	end = first + geometry.visible_count;
+	for (i = first; i < end; i++) {
+		const menu_entry *entry = &entries[i];
+		const char *name = menu_entry_name(entry);
+		const char *value = NULL;
+		int selected = i == sel;
+		int row_y = geometry.list_y + (i - first) * me_mfont_h;
+		int text_y = row_y + geometry.text_y - geometry.selection.y;
+		int name_clip_right = selection_right - me_mfont_w;
+		int color = selected ? MENU_STYLE_SELECTED_TEXT : menu_text_color;
+
+		if (entry->beh == MB_OPT_ONOFF) {
+			value = me_read_onoff(entry) ? on_text : off_text;
+			name_clip_right = columns.name_clip_right;
+		}
+		draw_cheat_name_styled(name, selected, geometry.text_x, text_y,
+					row_y, name_clip_right, elapsed_ms);
+		if (value == NULL)
+			continue;
+		value_clip.y = row_y;
+		if (selected)
+			menu_sdl2_draw_text_clipped_unshadowed(
+				g_menuscreen_ptr, g_menuscreen_pp, MENU_FONT_MAIN,
+				columns.value_x, text_y, color, value, &value_clip);
+		else
+			menu_sdl2_draw_text_clipped(
+				g_menuscreen_ptr, g_menuscreen_pp, MENU_FONT_MAIN,
+				columns.value_x, text_y, color, value, &value_clip);
+	}
+	menu_draw_end();
+	return 1;
+}
+
+static int menu_loop_cheats_styled(menu_entry *entries, int *menu_sel)
+{
+	unsigned int selected_since = plat_get_ticks_ms();
+	int count = me_count(entries);
+	int sel_max = count - 1;
+	int sel = *menu_sel;
+	int ret = 0;
+	unsigned long inp;
+
+	if (count <= 0)
+		return 0;
+	if (sel < 0 || sel > sel_max)
+		sel = 0;
+	while ((!entries[sel].enabled || !entries[sel].selectable) &&
+	       sel < sel_max)
+		sel++;
+	while (in_menu_wait_any(NULL, 50) &
+	       (PBTN_MOK|PBTN_MBACK|PBTN_MENU))
+		;
+	for (;;) {
+		int old_sel = sel;
+
+		if (!draw_cheats_menu_styled(entries, sel,
+				plat_get_ticks_ms() - selected_since))
+			return -1;
+		inp = in_menu_wait(PBTN_UP|PBTN_DOWN|PBTN_LEFT|PBTN_RIGHT|
+			PBTN_MOK|PBTN_MBACK|PBTN_MENU|PBTN_L|PBTN_R,
+			NULL, 70);
+		if (inp & (PBTN_MENU|PBTN_MBACK))
+			break;
+		if (inp & PBTN_UP) {
+			do {
+				sel--;
+				if (sel < 0)
+					sel = sel_max;
+			}
+			while (!entries[sel].enabled || !entries[sel].selectable);
+		}
+		if (inp & PBTN_DOWN) {
+			do {
+				sel++;
+				if (sel > sel_max)
+					sel = 0;
+			}
+			while (!entries[sel].enabled || !entries[sel].selectable);
+		}
+		if (sel != old_sel)
+			selected_since = plat_get_ticks_ms();
+		if ((inp & (PBTN_L|PBTN_R)) == (PBTN_L|PBTN_R))
+			debug_menu_loop();
+		if (inp & (PBTN_LEFT|PBTN_RIGHT|PBTN_L|PBTN_R)) {
+			if (me_process(&entries[sel],
+				       (inp & (PBTN_RIGHT|PBTN_R)) != 0,
+				       (inp & (PBTN_L|PBTN_R)) != 0))
+				continue;
+		}
+		if ((inp & (PBTN_MOK|PBTN_LEFT|PBTN_RIGHT|PBTN_L|PBTN_R)) &&
+		    entries[sel].handler != NULL &&
+		    (entries[sel].beh != MB_NONE || (inp & PBTN_MOK))) {
+			ret = entries[sel].handler(entries[sel].id, inp);
+			if (ret)
+				break;
+			count = me_count(entries);
+			sel_max = count - 1;
+		}
+	}
+	*menu_sel = sel;
+	return ret;
+}
+
+#endif
+
 static int menu_loop_cheats_page(int offset, int keys) {
 	/* persistent per-page selection for cheats */
 	static int *cheats_sel_per_page = NULL;
@@ -583,7 +780,14 @@ static int menu_loop_cheats_page(int offset, int keys) {
 		option->selectable = 1;
 		option->handler = menu_loop_cheats_page;
 	}
-	int ret = me_loop(e_menu_cheats, &sel);
+	int ret;
+#ifdef USE_SDL2
+	ret = menu_loop_cheats_styled(e_menu_cheats, &sel);
+	if (ret < 0)
+		ret = me_loop(e_menu_cheats, &sel);
+#else
+	ret = me_loop(e_menu_cheats, &sel);
+#endif
 	free(e_menu_cheats);
 	if (cheats_sel_per_page && page >= 0 && page < cheats_sel_pages_alloc)
 		cheats_sel_per_page[page] = sel;

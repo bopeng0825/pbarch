@@ -16,6 +16,11 @@ struct menu_style_geometry {
 	int visible_count;
 };
 
+struct menu_style_option_columns {
+	int name_clip_right;
+	int value_x;
+};
+
 int menu_style_main_geometry(const struct menu_responsive_layout *layout,
 			     int line_height, int text_height, int title_height,
 			     int glyph_width,
@@ -23,6 +28,9 @@ int menu_style_main_geometry(const struct menu_responsive_layout *layout,
 			     struct menu_style_geometry *geometry);
 int menu_style_next_savestate_slot(int current, int direction, int is_loading,
 				   unsigned int used_slots, int slot_count);
+int menu_style_option_columns(const struct menu_style_geometry *geometry,
+			      int glyph_width, int value_width,
+			      struct menu_style_option_columns *columns);
 void menu_style_draw_selection(uint16_t *pixels, int width, int height,
 			       int pitch, const struct menu_rect *selection,
 			       uint16_t fill);

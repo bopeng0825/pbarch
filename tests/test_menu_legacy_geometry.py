@@ -127,6 +127,16 @@ class LegacyMenuGeometryTest(unittest.TestCase):
 			body.index("menu_get_responsive_layout(&layout)"),
 		)
 
+	def test_savestate_menu_exposes_eight_slots(self):
+		self.assertIn("#define STATE_SLOT_COUNT 8", MENU_SOURCE)
+
+	def test_cheat_menu_uses_styled_columns_and_marquee(self):
+		self.assertIn("draw_cheats_menu_styled(", FRONTEND_MENU_SOURCE)
+		self.assertIn("menu_loop_cheats_styled(", FRONTEND_MENU_SOURCE)
+		self.assertIn("ui_text(UI_TEXT_CHEATS)", FRONTEND_MENU_SOURCE)
+		self.assertIn("menu_style_option_columns(", FRONTEND_MENU_SOURCE)
+		self.assertIn("menu_marquee_offset(", FRONTEND_MENU_SOURCE)
+
 	def test_styled_menu_uses_reference_spacing_and_lower_list_origin(self):
 		self.assertIn("spacing = (font_px * 3 + 2) / 5;", MENU_LAYOUT_SOURCE)
 		self.assertIn(

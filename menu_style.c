@@ -104,6 +104,26 @@ int menu_style_next_savestate_slot(int current, int direction, int is_loading,
 	return slot_count;
 }
 
+int menu_style_option_columns(const struct menu_style_geometry *geometry,
+			      int glyph_width, int value_width,
+			      struct menu_style_option_columns *columns)
+{
+	int content_right;
+
+	if (geometry == NULL || columns == NULL || glyph_width <= 0 ||
+	    value_width <= 0 || geometry->selection.w <= 0)
+		return 0;
+	content_right = geometry->selection.x + geometry->selection.w -
+		glyph_width;
+	columns->value_x = content_right - value_width;
+	if (columns->value_x < geometry->text_x)
+		return 0;
+	columns->name_clip_right = columns->value_x - glyph_width;
+	if (columns->name_clip_right < geometry->text_x)
+		columns->name_clip_right = geometry->text_x;
+	return 1;
+}
+
 void menu_style_draw_selection(uint16_t *pixels, int width, int height,
 			       int pitch, const struct menu_rect *selection,
 			       uint16_t fill)

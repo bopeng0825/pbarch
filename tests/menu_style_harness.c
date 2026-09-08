@@ -9,8 +9,8 @@ static void test_readable_font_hierarchy(void)
 	assert(menu_title_font_px(20) == 34);
 	assert(menu_title_font_px(30) == 48);
 	assert(menu_title_font_px(32) == 48);
-	assert(menu_spaced_line_height(24, 20) == 34);
-	assert(menu_spaced_line_height(36, 30) == 51);
+	assert(menu_spaced_line_height(24, 20) == 36);
+	assert(menu_spaced_line_height(36, 30) == 54);
 	assert(menu_spaced_line_height(0, 20) == 0);
 }
 
@@ -23,29 +23,29 @@ static void test_main_menu_geometry(void)
 	};
 	struct menu_style_geometry geometry;
 
-	assert(menu_style_main_geometry(&layout, 34, 24, 40, 12, 5, 0,
+	assert(menu_style_main_geometry(&layout, 36, 24, 40, 12, 5, 0,
 					&geometry));
 	assert(geometry.selection.x == 10);
-	assert(geometry.selection.y == 85);
+	assert(geometry.selection.y == 87);
 	assert(geometry.selection.w == 226);
-	assert(geometry.selection.h == 34);
+	assert(geometry.selection.h == 36);
 	assert(geometry.text_x == 34);
-	assert(geometry.text_y == 90);
+	assert(geometry.text_y == 93);
 	assert(geometry.title_x == 10);
 	assert(geometry.title_y == 20);
-	assert(geometry.list_y == 85);
+	assert(geometry.list_y == 87);
 
-	assert(menu_style_main_geometry(&layout, 34, 24, 40, 12, 5, 4,
+	assert(menu_style_main_geometry(&layout, 36, 24, 40, 12, 5, 4,
 					&geometry));
-	assert(geometry.selection.y == 221);
-	assert(geometry.text_y == 226);
-	assert(!menu_style_main_geometry(NULL, 34, 24, 40, 12, 5, 0,
+	assert(geometry.selection.y == 231);
+	assert(geometry.text_y == 237);
+	assert(!menu_style_main_geometry(NULL, 36, 24, 40, 12, 5, 0,
 					 &geometry));
 	assert(!menu_style_main_geometry(&layout, 0, 24, 40, 12, 5, 0,
 					 &geometry));
-	assert(!menu_style_main_geometry(&layout, 34, 24, 40, 12, 0, 0,
+	assert(!menu_style_main_geometry(&layout, 36, 24, 40, 12, 0, 0,
 					 &geometry));
-	assert(!menu_style_main_geometry(&layout, 34, 24, 40, 12, 5, 5,
+	assert(!menu_style_main_geometry(&layout, 36, 24, 40, 12, 5, 5,
 					 &geometry));
 }
 
@@ -53,11 +53,12 @@ static void test_h150102_geometry_stays_in_menu_column(void)
 {
 	struct menu_responsive_layout layout;
 	struct menu_style_geometry geometry;
+	struct menu_style_option_columns columns;
 
 	menu_calculate_responsive_layout(1280, 720, &layout);
 	assert(layout.output_width == 1280);
 	assert(layout.output_height == 720);
-	assert(menu_style_main_geometry(&layout, 51, 35, 56, 18, 10, 9,
+	assert(menu_style_main_geometry(&layout, 54, 35, 56, 18, 10, 9,
 					&geometry));
 	assert(geometry.selection.x == layout.menu.x / 2);
 	assert(geometry.selection.x + geometry.selection.w ==
@@ -65,6 +66,10 @@ static void test_h150102_geometry_stays_in_menu_column(void)
 	assert(geometry.selection.y >= layout.menu.y);
 	assert(geometry.selection.y + geometry.selection.h <=
 		layout.menu.y + layout.menu.h);
+	assert(menu_style_option_columns(&geometry, 18, 54, &columns));
+	assert(columns.name_clip_right <= columns.value_x);
+	assert(columns.value_x + 54 <=
+		geometry.selection.x + geometry.selection.w);
 }
 
 static void test_savestate_rows_share_responsive_menu_geometry(void)
@@ -76,14 +81,14 @@ static void test_savestate_rows_share_responsive_menu_geometry(void)
 	};
 	struct menu_style_geometry geometry;
 
-	assert(menu_style_main_geometry(&layout, 34, 24, 40, 12, 11, 10,
+	assert(menu_style_main_geometry(&layout, 36, 24, 40, 12, 9, 8,
 					&geometry));
 	assert(geometry.first_visible == 0);
-	assert(geometry.visible_count == 11);
-	assert(geometry.list_y == 85);
-	assert(geometry.text_y == 430);
-	assert(geometry.selection.y == 425);
-	assert(geometry.selection.y + geometry.selection.h == 459);
+	assert(geometry.visible_count == 9);
+	assert(geometry.list_y == 87);
+	assert(geometry.text_y == 381);
+	assert(geometry.selection.y == 375);
+	assert(geometry.selection.y + geometry.selection.h == 411);
 	assert(geometry.selection.x + geometry.selection.w == 236);
 }
 
@@ -91,13 +96,34 @@ static void test_savestate_navigation_preserves_empty_slot_rules(void)
 {
 	unsigned int used = (1u << 2) | (1u << 7);
 
-	assert(menu_style_next_savestate_slot(10, 1, 0, 0, 10) == 0);
-	assert(menu_style_next_savestate_slot(10, 1, 1, used, 10) == 2);
-	assert(menu_style_next_savestate_slot(2, 1, 1, used, 10) == 7);
-	assert(menu_style_next_savestate_slot(7, 1, 1, used, 10) == 10);
-	assert(menu_style_next_savestate_slot(10, -1, 1, used, 10) == 7);
-	assert(menu_style_next_savestate_slot(2, -1, 1, used, 10) == 10);
-	assert(menu_style_next_savestate_slot(10, 1, 1, 0, 10) == 10);
+	assert(menu_style_next_savestate_slot(8, 1, 0, 0, 8) == 0);
+	assert(menu_style_next_savestate_slot(8, 1, 1, used, 8) == 2);
+	assert(menu_style_next_savestate_slot(2, 1, 1, used, 8) == 7);
+	assert(menu_style_next_savestate_slot(7, 1, 1, used, 8) == 8);
+	assert(menu_style_next_savestate_slot(8, -1, 1, used, 8) == 7);
+	assert(menu_style_next_savestate_slot(2, -1, 1, used, 8) == 8);
+	assert(menu_style_next_savestate_slot(8, 1, 1, 0, 8) == 8);
+}
+
+static void test_option_columns_keep_value_inside_selection(void)
+{
+	struct menu_responsive_layout layout = {
+		.output_width = 640,
+		.output_height = 480,
+		.menu = { 20, 20, 228, 440 },
+	};
+	struct menu_style_geometry geometry;
+	struct menu_style_option_columns columns;
+
+	assert(menu_style_main_geometry(&layout, 36, 24, 40, 12, 11, 10,
+					&geometry));
+	assert(menu_style_option_columns(&geometry, 12, 36, &columns));
+	assert(columns.value_x == 188);
+	assert(columns.name_clip_right == 176);
+	assert(columns.name_clip_right <= columns.value_x);
+	assert(columns.value_x + 36 <=
+		geometry.selection.x + geometry.selection.w);
+	assert(!menu_style_option_columns(&geometry, 12, 300, &columns));
 }
 
 static void test_flat_selection_pixels(void)
@@ -147,6 +173,7 @@ int main(void)
 	test_h150102_geometry_stays_in_menu_column();
 	test_savestate_rows_share_responsive_menu_geometry();
 	test_savestate_navigation_preserves_empty_slot_rules();
+	test_option_columns_keep_value_inside_selection();
 	test_flat_selection_pixels();
 	test_clipped_selection();
 	return 0;
