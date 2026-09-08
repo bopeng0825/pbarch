@@ -8,7 +8,9 @@
 
 enum menu_font_role {
 	MENU_FONT_MAIN = 0,
-	MENU_FONT_SMALL
+	MENU_FONT_SMALL,
+	MENU_FONT_TITLE,
+	MENU_FONT_COUNT
 };
 
 #define MENU_FALLBACK_BG 0x18e3
@@ -20,7 +22,9 @@ int menu_sdl2_init(const char *font_path, const char *background_path,
 int menu_sdl2_available(void);
 int menu_sdl2_main_font_px(void);
 int menu_sdl2_small_font_px(void);
+int menu_sdl2_title_font_px(void);
 int menu_sdl2_line_height(enum menu_font_role role);
+int menu_sdl2_font_height(enum menu_font_role role);
 int menu_sdl2_text_width(enum menu_font_role role, const char *utf8);
 uint32_t menu_sdl2_scale_coordinate(uint32_t coordinate,
 				    uint32_t source_size,

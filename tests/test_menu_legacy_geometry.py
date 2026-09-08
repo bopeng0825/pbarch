@@ -12,6 +12,12 @@ FRONTEND_MENU_SOURCE = (
 SDL2_MENU_SOURCE = (
 	Path(__file__).resolve().parents[1] / "menu_sdl2.c"
 ).read_text(encoding="utf-8")
+MENU_LAYOUT_SOURCE = (
+	Path(__file__).resolve().parents[1] / "menu_layout.c"
+).read_text(encoding="utf-8")
+MENU_STYLE_SOURCE = (
+	Path(__file__).resolve().parents[1] / "menu_style.c"
+).read_text(encoding="utf-8")
 CHEAT_SOURCE = (
 	Path(__file__).resolve().parents[1] / "cheat.c"
 ).read_text(encoding="utf-8")
@@ -69,10 +75,74 @@ class LegacyMenuGeometryTest(unittest.TestCase):
 		self.assertRegex(
 			FRONTEND_MENU_SOURCE,
 			re.compile(
-				r"static void draw_main_menu_decor\(void\).*?"
+				r"static int draw_main_menu_styled\(int selected_index\).*?"
 				r"ui_text\(UI_TEXT_GAME_MENU\)",
 				re.DOTALL,
 			),
+		)
+		self.assertIn("menu_style_draw_selection(", FRONTEND_MENU_SOURCE)
+
+	def test_sdl2_main_menu_does_not_use_the_legacy_draw_loop(self):
+		loop = re.search(
+			r"void menu_loop\(void\)\s*\{(?P<body>.*?)"
+			r"\n\}\n\nint menu_init",
+			FRONTEND_MENU_SOURCE,
+			re.DOTALL,
+		)
+		self.assertIsNotNone(loop)
+		sdl_branch = re.search(
+			r"#ifdef USE_SDL2(?P<body>.*?)#else",
+			loop.group("body"),
+			re.DOTALL,
+		)
+		self.assertIsNotNone(sdl_branch)
+		self.assertIn("menu_loop_main_styled();", sdl_branch.group("body"))
+		self.assertNotIn("me_loop_d(", sdl_branch.group("body"))
+
+	def test_styled_main_menu_initializes_the_frame_before_layout_lookup(self):
+		draw = re.search(
+			r"static int draw_main_menu_styled\(int selected_index\)\s*"
+			r"\{(?P<body>.*?)\n\}",
+			FRONTEND_MENU_SOURCE,
+			re.DOTALL,
+		)
+		self.assertIsNotNone(draw)
+		body = draw.group("body")
+		self.assertLess(
+			body.index("menu_draw_begin(1, 1);"),
+			body.index("menu_get_responsive_layout(&layout)"),
+		)
+
+	def test_styled_savestate_initializes_the_frame_before_layout_lookup(self):
+		draw = re.search(
+			r"static int draw_savestate_menu_styled\(.*?\)\s*"
+			r"\{(?P<body>.*?)\n\}",
+			FRONTEND_MENU_SOURCE,
+			re.DOTALL,
+		)
+		self.assertIsNotNone(draw)
+		body = draw.group("body")
+		self.assertLess(
+			body.index("menu_draw_begin(1, 1);"),
+			body.index("menu_get_responsive_layout(&layout)"),
+		)
+
+	def test_styled_menu_uses_reference_spacing_and_lower_list_origin(self):
+		self.assertIn("spacing = font_px / 2;", MENU_LAYOUT_SOURCE)
+		self.assertIn(
+			"title_height + 3 * line_height / 4",
+			MENU_STYLE_SOURCE,
+		)
+
+	def test_styled_menu_centers_body_text_and_keeps_title_regular(self):
+		self.assertIn("int menu_sdl2_font_height(", SDL2_MENU_SOURCE)
+		self.assertNotIn(
+			"TTF_SetFontStyle(state.fonts[MENU_FONT_TITLE]",
+			SDL2_MENU_SOURCE,
+		)
+		self.assertIn(
+			"(line_height - text_height) / 2",
+			MENU_STYLE_SOURCE,
 		)
 
 	def test_sdl2_ttf_text_draws_shadow_before_foreground(self):
@@ -98,7 +168,7 @@ class LegacyMenuGeometryTest(unittest.TestCase):
 			for line in skin.read_text(encoding="ascii").splitlines()
 			if line and not line.startswith("#")
 		)
-		self.assertEqual(settings["selection_color"], "245b8c")
+		self.assertEqual(settings["selection_color"], "1e4f78")
 
 	def test_sdl2_cheat_descriptions_are_not_byte_truncated(self):
 		self.assertRegex(

@@ -35,7 +35,8 @@ struct menu_sdl2_state {
 	int height;
 	int main_px;
 	int small_px;
-	TTF_Font *fonts[2];
+	int title_px;
+	TTF_Font *fonts[MENU_FONT_COUNT];
 	uint16_t *background;
 	SDL_Surface *destination;
 	void *destination_pixels;
@@ -56,7 +57,7 @@ static void release_surface(void *value)
 
 static int role_valid(enum menu_font_role role)
 {
-	return role == MENU_FONT_MAIN || role == MENU_FONT_SMALL;
+	return role >= MENU_FONT_MAIN && role < MENU_FONT_COUNT;
 }
 
 static int framebuffer_span_valid(int pitch_pixels, int height)
@@ -200,6 +201,7 @@ int menu_sdl2_init(const char *font_path, const char *background_path,
 	state.height = height;
 	state.main_px = menu_main_font_px(height);
 	state.small_px = menu_small_font_px(state.main_px);
+	state.title_px = menu_title_font_px(state.main_px);
 	text_cache_init(&state.cache, MENU_TEXT_CACHE_LIMIT, release_surface);
 	text_cache_init(&state.metric_cache, MENU_METRIC_CACHE_LIMIT, free);
 
@@ -227,14 +229,21 @@ int menu_sdl2_init(const char *font_path, const char *background_path,
 	if (state.fonts[MENU_FONT_SMALL] == NULL)
 		fprintf(stderr, "menu: unable to open font %s at %d px: %s\n",
 			font_path, state.small_px, TTF_GetError());
+	state.fonts[MENU_FONT_TITLE] = TTF_OpenFont(font_path, state.title_px);
+	if (state.fonts[MENU_FONT_TITLE] == NULL)
+		fprintf(stderr, "menu: unable to open font %s at %d px: %s\n",
+			font_path, state.title_px, TTF_GetError());
 
 	if (!menu_sdl2_available()) {
 		if (state.fonts[MENU_FONT_MAIN] != NULL)
 			TTF_CloseFont(state.fonts[MENU_FONT_MAIN]);
 		if (state.fonts[MENU_FONT_SMALL] != NULL)
 			TTF_CloseFont(state.fonts[MENU_FONT_SMALL]);
+		if (state.fonts[MENU_FONT_TITLE] != NULL)
+			TTF_CloseFont(state.fonts[MENU_FONT_TITLE]);
 		state.fonts[MENU_FONT_MAIN] = NULL;
 		state.fonts[MENU_FONT_SMALL] = NULL;
+		state.fonts[MENU_FONT_TITLE] = NULL;
 	}
 	return 0;
 }
@@ -242,7 +251,8 @@ int menu_sdl2_init(const char *font_path, const char *background_path,
 int menu_sdl2_available(void)
 {
 	return state.fonts[MENU_FONT_MAIN] != NULL &&
-	       state.fonts[MENU_FONT_SMALL] != NULL;
+	       state.fonts[MENU_FONT_SMALL] != NULL &&
+	       state.fonts[MENU_FONT_TITLE] != NULL;
 }
 
 int menu_sdl2_main_font_px(void)
@@ -255,11 +265,26 @@ int menu_sdl2_small_font_px(void)
 	return state.small_px;
 }
 
+int menu_sdl2_title_font_px(void)
+{
+	return state.title_px;
+}
+
 int menu_sdl2_line_height(enum menu_font_role role)
 {
 	if (!role_valid(role) || state.fonts[role] == NULL)
 		return 0;
+	if (role == MENU_FONT_MAIN)
+		return menu_spaced_line_height(TTF_FontLineSkip(state.fonts[role]),
+					       state.main_px);
 	return TTF_FontLineSkip(state.fonts[role]);
+}
+
+int menu_sdl2_font_height(enum menu_font_role role)
+{
+	if (!role_valid(role) || state.fonts[role] == NULL)
+		return 0;
+	return TTF_FontHeight(state.fonts[role]);
 }
 
 int menu_sdl2_text_width(enum menu_font_role role, const char *utf8)
@@ -474,6 +499,8 @@ void menu_sdl2_finish(void)
 		TTF_CloseFont(state.fonts[MENU_FONT_MAIN]);
 	if (state.fonts[MENU_FONT_SMALL] != NULL)
 		TTF_CloseFont(state.fonts[MENU_FONT_SMALL]);
+	if (state.fonts[MENU_FONT_TITLE] != NULL)
+		TTF_CloseFont(state.fonts[MENU_FONT_TITLE]);
 	free(state.background);
 	memset(&state, 0, sizeof(state));
 }

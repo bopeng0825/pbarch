@@ -26,6 +26,8 @@ struct menu_responsive_layout {
 
 int menu_main_font_px(int menu_height);
 int menu_small_font_px(int main_px);
+int menu_title_font_px(int main_px);
+int menu_spaced_line_height(int font_line_height, int font_px);
 size_t menu_utf8_cells(const char *text);
 size_t menu_utf8_truncate_cells(const char *src, size_t max_cells,
 				char *dst, size_t dst_size);

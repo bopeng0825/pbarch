@@ -48,7 +48,10 @@ static void test_valid_renderer(void)
 	assert(menu_sdl2_available());
 	assert(menu_sdl2_main_font_px() == 20);
 	assert(menu_sdl2_small_font_px() == 16);
+	assert(menu_sdl2_title_font_px() == 34);
 	assert(menu_sdl2_line_height(MENU_FONT_MAIN) > 0);
+	assert(menu_sdl2_line_height(MENU_FONT_TITLE) > 0);
+	assert(menu_sdl2_font_height(MENU_FONT_MAIN) > 0);
 #ifdef MENU_SDL2_TEST
 	assert(menu_sdl2_metric_cache_entries() == 0);
 	assert(menu_sdl2_measure_calls() == 0);

@@ -5,6 +5,7 @@
 #include "ui_language.h"
 #ifdef USE_SDL2
 #include "menu_sdl2.h"
+#include "menu_style.h"
 #endif
 #include "options.h"
 #include "overrides.h"
@@ -17,6 +18,9 @@
 #endif
 
 #define PXMAKE(r,g,b) ((((r)<<8) & 0xf800)|(((g)<<3) & 0x07e0)|((b)>>3))
+#define MENU_STYLE_SELECTION PXMAKE(0x72, 0xa6, 0xce)
+#define MENU_STYLE_SELECTED_TEXT PXMAKE(0x10, 0x28, 0x38)
+#define MENU_STYLE_TITLE PXMAKE(0xe4, 0xe7, 0xe9)
 
 static int drew_alt_bg = 0;
 static int full_menu_enabled;
@@ -128,6 +132,9 @@ const char *menu_translate(unsigned short text_id)
 #include "libpicofe/menu.c"
 
 static void draw_menu_message(const char *msg, void (*draw_more)(void))  __attribute__((unused));
+#ifdef USE_SDL2
+static int menu_loop_savestate_styled(int is_loading);
+#endif
 
 static const char *mgn_saveloadcfg(int id, int *offs)
 {
@@ -911,9 +918,17 @@ static int main_menu_handler(int id, int keys)
 	case MA_MAIN_RESUME_GAME:
 		return 1;
 	case MA_MAIN_SAVE_STATE:
+#ifdef USE_SDL2
+		return menu_loop_savestate_styled(0);
+#else
 		return menu_loop_savestate(0);
+#endif
 	case MA_MAIN_LOAD_STATE:
+#ifdef USE_SDL2
+		return menu_loop_savestate_styled(1);
+#else
 		return menu_loop_savestate(1);
+#endif
 	case MA_MAIN_RESET_GAME:
 		current_core.retro_reset();
 		return 1;
@@ -948,14 +963,268 @@ static menu_entry e_menu_main[] =
 };
 
 #ifdef USE_SDL2
-static void draw_main_menu_decor(void)
+static int main_menu_sel;
+
+static int draw_main_menu_styled(int selected_index)
 {
 	struct menu_responsive_layout layout;
+	struct menu_style_geometry geometry;
+	struct menu_rect clip;
+	int enabled_count = 0;
+	int selected_visible = -1;
+	int visible_index = 0;
+	int drawn_index = 0;
+	int text_height;
+	int title_height;
+	int i;
 
-	if (!menu_get_responsive_layout(&layout))
+	menu_draw_begin(1, 1);
+	if (!menu_get_responsive_layout(&layout) || selected_index < 0) {
+		menu_draw_end();
+		return 0;
+	}
+	for (i = 0; menu_entry_present(&e_menu_main[i]); i++) {
+		if (!e_menu_main[i].enabled)
+			continue;
+		if (i == selected_index)
+			selected_visible = enabled_count;
+		enabled_count++;
+	}
+	text_height = menu_sdl2_font_height(MENU_FONT_MAIN);
+	title_height = menu_sdl2_line_height(MENU_FONT_TITLE);
+	if (!menu_style_main_geometry(&layout, me_mfont_h, text_height,
+				      title_height,
+				      me_mfont_w,
+				      enabled_count, selected_visible,
+				      &geometry)) {
+		menu_draw_end();
+		return 0;
+	}
+
+	menu_style_draw_selection(g_menuscreen_ptr, g_menuscreen_w,
+				  g_menuscreen_h, g_menuscreen_pp,
+				  &geometry.selection, MENU_STYLE_SELECTION);
+	menu_sdl2_draw_text(g_menuscreen_ptr, g_menuscreen_pp,
+			   MENU_FONT_TITLE, geometry.title_x, geometry.title_y,
+			   MENU_STYLE_TITLE,
+			   ui_text(UI_TEXT_GAME_MENU));
+	clip.x = geometry.text_x;
+	clip.w = geometry.selection.x + geometry.selection.w - clip.x;
+	clip.h = me_mfont_h;
+	for (i = 0; menu_entry_present(&e_menu_main[i]); i++) {
+		const char *name;
+		int color;
+		int row_y;
+		int text_y;
+
+		if (!e_menu_main[i].enabled)
+			continue;
+		if (visible_index++ < geometry.first_visible)
+			continue;
+		if (drawn_index >= geometry.visible_count)
+			break;
+		name = menu_entry_name(&e_menu_main[i]);
+		row_y = geometry.list_y + drawn_index++ * me_mfont_h;
+		text_y = row_y + geometry.text_y - geometry.selection.y;
+		color = i == selected_index ? MENU_STYLE_SELECTED_TEXT :
+			menu_text_color;
+		clip.y = row_y;
+		menu_sdl2_draw_text_clipped(g_menuscreen_ptr, g_menuscreen_pp,
+					    MENU_FONT_MAIN, geometry.text_x, text_y,
+					    color, name, &clip);
+	}
+	if (menu_error_msg[0] != 0) {
+		clip.x = layout.outer_margin;
+		clip.y = g_menuscreen_h - me_mfont_h - layout.outer_margin;
+		clip.w = g_menuscreen_w - 2 * layout.outer_margin;
+		clip.h = me_mfont_h;
+		menu_sdl2_draw_text_clipped(g_menuscreen_ptr, g_menuscreen_pp,
+					    MENU_FONT_MAIN, clip.x, clip.y,
+					    menu_text_color, menu_error_msg,
+					    &clip);
+		if (plat_get_ticks_ms() - menu_error_time > 2048)
+			menu_error_msg[0] = 0;
+	}
+	menu_draw_end();
+	return 1;
+}
+
+static void menu_loop_main_styled(void)
+{
+	unsigned long inp;
+	int count = me_count(e_menu_main);
+	int sel_max = count - 1;
+	int sel = main_menu_sel;
+
+	if (count <= 0)
 		return;
-	text_out16(layout.menu.x + me_mfont_w * 3, layout.menu.y,
-		   "%s", ui_text(UI_TEXT_GAME_MENU));
+	if (sel < 0 || sel > sel_max)
+		sel = 0;
+	while ((!e_menu_main[sel].enabled ||
+	        !e_menu_main[sel].selectable) && sel < sel_max)
+		sel++;
+
+	while (in_menu_wait_any(NULL, 50) &
+	       (PBTN_MOK|PBTN_MBACK|PBTN_MENU))
+		;
+	for (;;) {
+		if (!draw_main_menu_styled(sel)) {
+			me_loop(e_menu_main, &main_menu_sel);
+			return;
+		}
+		inp = in_menu_wait(PBTN_UP|PBTN_DOWN|PBTN_LEFT|PBTN_RIGHT|
+			PBTN_MOK|PBTN_MBACK|PBTN_MENU|PBTN_L|PBTN_R,
+			NULL, 70);
+		if (inp & (PBTN_MENU|PBTN_MBACK))
+			break;
+		if (inp & PBTN_UP) {
+			do {
+				sel--;
+				if (sel < 0)
+					sel = sel_max;
+			}
+			while (!e_menu_main[sel].enabled ||
+			       !e_menu_main[sel].selectable);
+		}
+		if (inp & PBTN_DOWN) {
+			do {
+				sel++;
+				if (sel > sel_max)
+					sel = 0;
+			}
+			while (!e_menu_main[sel].enabled ||
+			       !e_menu_main[sel].selectable);
+		}
+		if ((inp & (PBTN_L|PBTN_R)) == (PBTN_L|PBTN_R))
+			debug_menu_loop();
+		if ((inp & PBTN_MOK) && e_menu_main[sel].handler != NULL &&
+		    e_menu_main[sel].handler(e_menu_main[sel].id, inp))
+			break;
+	}
+	main_menu_sel = sel;
+}
+
+static int draw_savestate_menu_styled(int menu_sel, int is_loading)
+{
+	struct menu_responsive_layout layout;
+	struct menu_style_geometry geometry;
+	struct menu_rect clip;
+	char row[96];
+	char time_buf[32];
+	const char *title;
+	int text_height;
+	int title_height;
+	int first;
+	int end;
+	int i;
+
+	if (menu_sel < STATE_SLOT_COUNT &&
+	    (state_slot_flags & (1 << menu_sel)))
+		draw_savestate_bg(menu_sel);
+
+	menu_draw_begin(1, 1);
+	if (!menu_get_responsive_layout(&layout)) {
+		menu_draw_end();
+		return 0;
+	}
+	text_height = menu_sdl2_font_height(MENU_FONT_MAIN);
+	title_height = menu_sdl2_line_height(MENU_FONT_TITLE);
+	if (!menu_style_main_geometry(&layout, me_mfont_h, text_height,
+				      title_height,
+				      me_mfont_w,
+				      STATE_SLOT_COUNT + 1, menu_sel,
+				      &geometry)) {
+		menu_draw_end();
+		return 0;
+	}
+	menu_style_draw_selection(g_menuscreen_ptr, g_menuscreen_w,
+				  g_menuscreen_h, g_menuscreen_pp,
+				  &geometry.selection, MENU_STYLE_SELECTION);
+
+	title = menu_translate(is_loading ? UI_TEXT_LOAD_STATE_TITLE :
+			       UI_TEXT_SAVE_STATE_TITLE);
+	menu_sdl2_draw_text(g_menuscreen_ptr, g_menuscreen_pp,
+			   MENU_FONT_TITLE, geometry.title_x, geometry.title_y,
+			   MENU_STYLE_TITLE, title);
+	clip.x = geometry.text_x;
+	clip.w = geometry.selection.x + geometry.selection.w - geometry.text_x;
+	clip.h = me_mfont_h;
+	first = geometry.first_visible;
+	end = first + geometry.visible_count;
+	for (i = first; i < end; i++) {
+		int row_y = geometry.list_y + (i - first) * me_mfont_h;
+		int text_y = row_y + geometry.text_y - geometry.selection.y;
+		int color = i == menu_sel ? MENU_STYLE_SELECTED_TEXT :
+			menu_text_color;
+
+		if (i < STATE_SLOT_COUNT) {
+			if (!(state_slot_flags & (1 << i)))
+				strcpy(time_buf, "free");
+			else {
+				strcpy(time_buf, "USED");
+				if (state_slot_times[i] != 0) {
+					time_t time = state_slot_times[i];
+					struct tm *stamp = localtime(&time);
+
+					strftime(time_buf, sizeof(time_buf), "%x %R",
+						 stamp);
+				}
+			}
+			snprintf(row, sizeof(row), menu_translate(UI_TEXT_SLOT_FMT),
+				 i, time_buf);
+		}
+		else
+			snprintf(row, sizeof(row), "%s", menu_translate(UI_TEXT_BACK));
+
+		clip.y = row_y;
+		menu_sdl2_draw_text_clipped(g_menuscreen_ptr, g_menuscreen_pp,
+					    MENU_FONT_MAIN, geometry.text_x, text_y,
+					    color, row, &clip);
+	}
+	menu_draw_end();
+	return 1;
+}
+
+static int menu_loop_savestate_styled(int is_loading)
+{
+	static int menu_sel = STATE_SLOT_COUNT;
+	int menu_sel_max = STATE_SLOT_COUNT;
+	unsigned long inp;
+	int ret = 0;
+
+	state_check_slots();
+	if (!(state_slot_flags & (1 << menu_sel)) && is_loading)
+		menu_sel = menu_sel_max;
+
+	for (;;) {
+		if (!draw_savestate_menu_styled(menu_sel, is_loading))
+			return menu_loop_savestate(is_loading);
+		inp = in_menu_wait(PBTN_UP|PBTN_DOWN|PBTN_MOK|PBTN_MBACK,
+				   NULL, 100);
+		if (inp & PBTN_UP)
+			menu_sel = menu_style_next_savestate_slot(menu_sel, -1,
+				is_loading, (unsigned int)state_slot_flags,
+				STATE_SLOT_COUNT);
+		if (inp & PBTN_DOWN)
+			menu_sel = menu_style_next_savestate_slot(menu_sel, 1,
+				is_loading, (unsigned int)state_slot_flags,
+				STATE_SLOT_COUNT);
+		if (inp & PBTN_MOK) {
+			if (menu_sel < STATE_SLOT_COUNT) {
+				state_slot = menu_sel;
+				if (emu_save_load_game(is_loading, 0)) {
+					menu_update_msg(menu_translate(is_loading ?
+						UI_TEXT_LOAD_FAILED : UI_TEXT_SAVE_FAILED));
+					break;
+				}
+				ret = 1;
+			}
+			break;
+		}
+		if (inp & PBTN_MBACK)
+			break;
+	}
+	return ret;
 }
 #endif
 
@@ -993,18 +1262,20 @@ finish:
 void menu_begin(void)
 {
 #ifdef USE_SDL2
-	if (menu_sdl2_initialized && !drew_alt_bg) {
+	if (menu_sdl2_initialized) {
 		struct menu_responsive_layout layout;
 
 		menu_calculate_responsive_layout(g_menuscreen_w, g_menuscreen_h,
 					 &layout);
-		menu_sdl2_copy_background(g_menubg_ptr, g_menuscreen_w);
-		menu_sdl2_draw_preview(g_menubg_ptr, g_menuscreen_w,
-				       g_menubg_src_ptr, g_menubg_src_w,
-				       g_menubg_src_h, g_menubg_src_pp,
-				       &layout.preview);
+		if (!drew_alt_bg) {
+			menu_sdl2_copy_background(g_menubg_ptr, g_menuscreen_w);
+			menu_sdl2_draw_preview(g_menubg_ptr, g_menuscreen_w,
+					       g_menubg_src_ptr, g_menubg_src_w,
+					       g_menubg_src_h, g_menubg_src_pp,
+					       &layout.preview);
+			drew_alt_bg = 1;
+		}
 		menu_set_responsive_layout(&layout);
-		drew_alt_bg = 1;
 	}
 #endif
 	if (!drew_alt_bg)
@@ -1021,7 +1292,9 @@ void menu_end(void)
 
 void menu_loop(void)
 {
+#ifndef USE_SDL2
 	static int sel = 0;
+#endif
 	bool needs_disc_ctrl = disc_get_count() > 1;
 
 	plat_video_menu_enter(1);
@@ -1044,7 +1317,7 @@ void menu_loop(void)
 	}
 #endif
 #ifdef USE_SDL2
-	me_loop_d(e_menu_main, &sel, NULL, draw_main_menu_decor);
+	menu_loop_main_styled();
 #else
 	me_loop(e_menu_main, &sel);
 #endif

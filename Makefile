@@ -150,7 +150,7 @@ else ifeq ($(platform), funkey-s)
 else ifeq ($(platform), h150101)
 	SOURCES := $(filter-out libpicofe/in_sdl.c,$(SOURCES))
 	SOURCES += plat_h150101.c plat_h150101_sdl2_input.c
-	SOURCES += menu_sdl2.c text_cache.c
+	SOURCES += menu_sdl2.c menu_style.c text_cache.c
 	CFLAGS += -DUSE_SDL2 $(shell $(SYSROOT)/usr/bin/sdl2-config --cflags)
 	CFLAGS += -DCONTENT_DIR='"/mnt"' -DH150101 -march=mips32r2 -mhard-float
 	LDFLAGS += -lSDL2_ttf $(shell $(SYSROOT)/usr/bin/sdl2-config --libs)
@@ -158,13 +158,13 @@ else ifeq ($(platform), h150101)
 else ifeq ($(platform), h150102)
 	SOURCES := $(filter-out libpicofe/in_sdl.c,$(SOURCES))
 	SOURCES += plat_h150102.c plat_h150101_sdl2_input.c
-	SOURCES += menu_sdl2.c text_cache.c
+	SOURCES += menu_sdl2.c menu_style.c text_cache.c
 	CFLAGS += -DUSE_SDL2 $(shell $(SYSROOT)/usr/bin/sdl2-config --cflags)
 	CFLAGS += -DCONTENT_DIR='"/mnt"' -DH150102 -march=mips32r2 -mhard-float
 	LDFLAGS += -lSDL2_ttf $(shell $(SYSROOT)/usr/bin/sdl2-config --libs)
 	LDFLAGS += -fPIC
 else ifeq ($(platform), unix)
-	SOURCES += plat_linux.c menu_sdl2.c text_cache.c
+	SOURCES += plat_linux.c menu_sdl2.c menu_style.c text_cache.c
 	CFLAGS += -DUSE_SDL2 $(shell $(SYSROOT)/usr/bin/sdl2-config --cflags)
 	LDFLAGS += -lSDL2_ttf $(shell $(SYSROOT)/usr/bin/sdl2-config --libs)
 	LDFLAGS += -fPIE

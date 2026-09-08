@@ -206,10 +206,14 @@ def non_sdl_forces_english(source: str) -> bool:
 
 
 def background_copy_preserves_alt_preview(source: str) -> bool:
+    body = _function_body(source, r"void\s+menu_begin\s*\([^)]*\)")
+    if body is None:
+        return False
     return re.search(
-        r"if\s*\(\s*menu_sdl2_initialized\s*&&\s*!drew_alt_bg\s*\)"
-        r"\s*\{.*?menu_sdl2_copy_background\s*\(",
-        source,
+        r"if\s*\(\s*!drew_alt_bg\s*\)\s*\{.*?"
+        r"menu_sdl2_copy_background\s*\(.*?\}\s*"
+        r"menu_set_responsive_layout\s*\(",
+        body,
         re.DOTALL,
     ) is not None
 

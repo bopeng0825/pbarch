@@ -110,6 +110,29 @@ int menu_small_font_px(int main_px)
 	return (main_px * 4 + 2) / 5;
 }
 
+int menu_title_font_px(int main_px)
+{
+	int pixels = (main_px * 17 + 5) / 10;
+
+	if (pixels < 20)
+		pixels = 20;
+	if (pixels > 48)
+		pixels = 48;
+	return pixels;
+}
+
+int menu_spaced_line_height(int font_line_height, int font_px)
+{
+	int spacing;
+
+	if (font_line_height <= 0)
+		return 0;
+	spacing = font_px / 2;
+	if (spacing < 1)
+		spacing = 1;
+	return font_line_height + spacing;
+}
+
 void menu_calculate_responsive_layout(int output_width, int output_height,
 				      struct menu_responsive_layout *layout)
 {
