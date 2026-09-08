@@ -41,6 +41,85 @@ def catalog_codepoints():
 	return characters
 
 
+def sfnt_codepoints(path):
+	"""Return mapped Unicode code points using only the Python standard library."""
+	data = path.read_bytes()
+	if len(data) < 12:
+		raise ValueError("truncated font offset table")
+	table_count = struct.unpack_from(">H", data, 4)[0]
+	tables = {}
+	for index in range(table_count):
+		record = 12 + index * 16
+		if record + 16 > len(data):
+			raise ValueError("truncated font table directory")
+		tag, _, offset, length = struct.unpack_from(">4sIII", data, record)
+		if offset + length > len(data):
+			raise ValueError("font table extends past end of file")
+		tables[tag] = (offset, length)
+	if b"cmap" not in tables:
+		raise ValueError("font is missing cmap table")
+
+	cmap_offset, cmap_length = tables[b"cmap"]
+	if cmap_length < 4:
+		raise ValueError("truncated cmap table")
+	subtable_count = struct.unpack_from(">H", data, cmap_offset + 2)[0]
+	codepoints = set()
+	seen = set()
+	for index in range(subtable_count):
+		record = cmap_offset + 4 + index * 8
+		if record + 8 > cmap_offset + cmap_length:
+			raise ValueError("truncated cmap encoding record")
+		relative = struct.unpack_from(">I", data, record + 4)[0]
+		subtable = cmap_offset + relative
+		if subtable in seen:
+			continue
+		seen.add(subtable)
+		if subtable + 2 > len(data):
+			raise ValueError("truncated cmap subtable")
+		format_number = struct.unpack_from(">H", data, subtable)[0]
+		if format_number == 4:
+			length = struct.unpack_from(">H", data, subtable + 2)[0]
+			segment_bytes = struct.unpack_from(">H", data, subtable + 6)[0]
+			if subtable + length > len(data):
+				raise ValueError("truncated cmap format 4 subtable")
+			segment_count = segment_bytes // 2
+			end_offset = subtable + 14
+			start_offset = end_offset + segment_count * 2 + 2
+			delta_offset = start_offset + segment_count * 2
+			range_offset = delta_offset + segment_count * 2
+			for segment in range(segment_count):
+				start = struct.unpack_from(">H", data, start_offset + segment * 2)[0]
+				end = struct.unpack_from(">H", data, end_offset + segment * 2)[0]
+				delta = struct.unpack_from(">H", data, delta_offset + segment * 2)[0]
+				range_value = struct.unpack_from(">H", data, range_offset + segment * 2)[0]
+				for codepoint in range(start, min(end, 0xfffe) + 1):
+					if range_value == 0:
+						glyph = (codepoint + delta) & 0xffff
+					else:
+						glyph_offset = range_offset + segment * 2 + range_value
+						glyph_offset += (codepoint - start) * 2
+						if glyph_offset + 2 > subtable + length:
+							raise ValueError("invalid cmap format 4 glyph offset")
+						glyph = struct.unpack_from(">H", data, glyph_offset)[0]
+						if glyph:
+							glyph = (glyph + delta) & 0xffff
+					if glyph:
+						codepoints.add(codepoint)
+		elif format_number == 12:
+			length = struct.unpack_from(">I", data, subtable + 4)[0]
+			group_count = struct.unpack_from(">I", data, subtable + 12)[0]
+			if subtable + length > len(data):
+				raise ValueError("truncated cmap format 12 subtable")
+			for group in range(group_count):
+				start, end, first_glyph = struct.unpack_from(
+					">III", data, subtable + 16 + group * 12
+				)
+				for codepoint in range(start, end + 1):
+					if first_glyph + codepoint - start:
+						codepoints.add(codepoint)
+	return codepoints
+
+
 def load_fonttools():
 	try:
 		import fontTools
@@ -110,6 +189,11 @@ def check_assets():
 	missing = [path for path in (FONT, LICENSE, BACKGROUND) if not path.is_file()]
 	if missing:
 		raise RuntimeError("missing asset(s): " + ", ".join(str(path) for path in missing))
+	required = {ord(character) for character in catalog_codepoints()}
+	missing_codepoints = sorted(required - sfnt_codepoints(FONT))
+	if missing_codepoints:
+		values = ", ".join(f"U+{codepoint:04X}" for codepoint in missing_codepoints)
+		raise RuntimeError(f"font is missing required code points: {values}")
 
 	TTFont, _ = load_fonttools()
 	with TTFont(FONT, lazy=True) as font:
@@ -123,14 +207,6 @@ def check_assets():
 				"font must be static TrueType; found table(s): "
 				+ ", ".join(disallowed_tables)
 			)
-		codepoints = set()
-		for table in font["cmap"].tables:
-			codepoints.update(table.cmap)
-		required = {ord(character) for character in catalog_codepoints()}
-		missing_codepoints = sorted(required - codepoints)
-		if missing_codepoints:
-			values = ", ".join(f"U+{codepoint:04X}" for codepoint in missing_codepoints)
-			raise RuntimeError(f"font is missing required code points: {values}")
 		if font_family_names(font) != {FAMILY_NAME}:
 			raise RuntimeError(
 				f"font family must be {FAMILY_NAME!r}, got {sorted(font_family_names(font))}"
