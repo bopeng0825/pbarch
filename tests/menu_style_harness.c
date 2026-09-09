@@ -166,6 +166,36 @@ static void test_clipped_selection(void)
 	assert(pixels[4 * 5 + 4] == 0);
 }
 
+static void test_page_footer_fits_both_devices(void)
+{
+	int widths[] = { 640, 1280 };
+	int heights[] = { 480, 720 };
+	int lines[] = { 36, 54 };
+	int titles[] = { 40, 56 };
+	int device;
+
+	for (device = 0; device < 2; device++) {
+		struct menu_responsive_layout layout;
+		struct menu_style_geometry geometry;
+		int capacity, footer_y, row, line = lines[device];
+
+		menu_calculate_responsive_layout(widths[device], heights[device], &layout);
+		capacity = menu_style_page_capacity(&layout, line, titles[device]);
+		assert(capacity == 8);
+		footer_y = layout.menu.y + layout.menu.h - line;
+		layout.menu.h -= line + line / 2;
+		for (row = 0; row < capacity; row++) {
+			assert(menu_style_main_geometry(&layout, line, line - 12,
+				titles[device], 12, capacity, row, &geometry));
+			assert(geometry.first_visible == 0);
+			assert(geometry.visible_count == capacity);
+			assert(geometry.selection.y + line <= footer_y - line / 2);
+		}
+		assert(footer_y + line <= heights[device]);
+	}
+	assert(menu_style_page_capacity(NULL, 36, 40) == 0);
+}
+
 int main(void)
 {
 	test_readable_font_hierarchy();
@@ -176,5 +206,6 @@ int main(void)
 	test_option_columns_keep_value_inside_selection();
 	test_flat_selection_pixels();
 	test_clipped_selection();
+	test_page_footer_fits_both_devices();
 	return 0;
 }

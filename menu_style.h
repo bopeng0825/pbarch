@@ -21,6 +21,10 @@ struct menu_style_option_columns {
 	int value_x;
 };
 
+/* Reserve a fixed footer row and half a row of separation. */
+int menu_style_page_capacity(const struct menu_responsive_layout *layout,
+			    int line_height, int title_height);
+
 int menu_style_main_geometry(const struct menu_responsive_layout *layout,
 			     int line_height, int text_height, int title_height,
 			     int glyph_width,

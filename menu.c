@@ -550,7 +550,8 @@ static void draw_cheat_name_styled(const char *name, int selected,
 			second_x, y, color, name, &clip);
 }
 
-static int draw_cheats_menu_styled(menu_entry *entries, int sel,
+static int draw_cheats_menu_styled(menu_entry *entries, int count, int sel,
+				    int footer, int previous, int next,
 				    unsigned int elapsed_ms)
 {
 	struct menu_responsive_layout layout;
@@ -564,7 +565,7 @@ static int draw_cheats_menu_styled(menu_entry *entries, int sel,
 	int text_height;
 	int title_height;
 	int selection_right;
-	int count = me_count(entries);
+	int footer_y;
 	int first;
 	int end;
 	int i;
@@ -573,14 +574,18 @@ static int draw_cheats_menu_styled(menu_entry *entries, int sel,
 		value_width = off_width;
 	menu_draw_begin(1, 1);
 	if (!menu_get_responsive_layout(&layout) || count <= 0 ||
-	    sel < 0 || sel >= count) {
+	    sel < 0 || sel > count) {
 		menu_draw_end();
 		return 0;
 	}
 	text_height = menu_sdl2_font_height(MENU_FONT_MAIN);
 	title_height = menu_sdl2_line_height(MENU_FONT_TITLE);
+	/* Footer stays at the bottom of the menu column on both devices. */
+	footer_y = layout.menu.y + layout.menu.h - me_mfont_h;
+	layout.menu.h -= me_mfont_h + me_mfont_h / 2;
 	if (!menu_style_main_geometry(&layout, me_mfont_h, text_height,
-				      title_height, me_mfont_w, count, sel,
+				      title_height, me_mfont_w, count,
+				      sel < count ? sel : count - 1,
 				      &geometry) ||
 	    !menu_style_option_columns(&geometry, me_mfont_w, value_width,
 				       &columns)) {
@@ -588,7 +593,8 @@ static int draw_cheats_menu_styled(menu_entry *entries, int sel,
 		return 0;
 	}
 	selection_right = geometry.selection.x + geometry.selection.w;
-	menu_style_draw_selection(g_menuscreen_ptr, g_menuscreen_w,
+	if (sel < count)
+		menu_style_draw_selection(g_menuscreen_ptr, g_menuscreen_w,
 				  g_menuscreen_h, g_menuscreen_pp,
 				  &geometry.selection, MENU_STYLE_SELECTION);
 	menu_sdl2_draw_text(g_menuscreen_ptr, g_menuscreen_pp,
@@ -628,13 +634,43 @@ static int draw_cheats_menu_styled(menu_entry *entries, int sel,
 				g_menuscreen_ptr, g_menuscreen_pp, MENU_FONT_MAIN,
 				columns.value_x, text_y, color, value, &value_clip);
 	}
+	for (i = 0; i < 3; i++) {
+		const char *label;
+		struct menu_rect button;
+		int selected = sel == count && footer == i;
+		int width;
+		int y;
+
+		if ((i == 0 && !previous) || (i == 2 && !next))
+			continue;
+		label = ui_text(i == 0 ? UI_TEXT_PREVIOUS_PAGE :
+			i == 2 ? UI_TEXT_NEXT_PAGE : UI_TEXT_BACK);
+		button.x = geometry.selection.x + geometry.selection.w * i / 3;
+		button.y = footer_y;
+		button.w = geometry.selection.w * (i + 1) / 3 -
+			geometry.selection.w * i / 3;
+		button.h = me_mfont_h;
+		width = menu_sdl2_text_width(MENU_FONT_SMALL, label);
+		y = footer_y + (me_mfont_h - menu_sdl2_font_height(MENU_FONT_SMALL)) / 2;
+		if (selected)
+			menu_style_draw_selection(g_menuscreen_ptr, g_menuscreen_w,
+				g_menuscreen_h, g_menuscreen_pp, &button, MENU_STYLE_SELECTION);
+		menu_sdl2_draw_text_clipped_unshadowed(g_menuscreen_ptr,
+			g_menuscreen_pp, MENU_FONT_SMALL,
+			button.x + (button.w - width) / 2, y,
+			selected ? MENU_STYLE_SELECTED_TEXT : menu_text_color, label, &button);
+	}
 	menu_draw_end();
 	return 1;
 }
 
 struct cheats_menu_redraw {
 	menu_entry *entries;
+	int count;
 	int sel;
+	int footer;
+	int previous;
+	int next;
 	unsigned int selected_since;
 	int draw_ok;
 };
@@ -643,87 +679,111 @@ static void draw_cheats_menu_idle(void *data)
 {
 	struct cheats_menu_redraw *redraw = data;
 
-	redraw->draw_ok = draw_cheats_menu_styled(redraw->entries, redraw->sel,
+	redraw->draw_ok = draw_cheats_menu_styled(redraw->entries, redraw->count,
+		redraw->sel, redraw->footer, redraw->previous, redraw->next,
 		plat_get_ticks_ms() - redraw->selected_since);
 }
 
 static int menu_loop_cheats_styled(menu_entry *entries, int *menu_sel)
 {
 	unsigned int selected_since = plat_get_ticks_ms();
-	int count = me_count(entries);
-	int sel_max = count - 1;
-	int sel = *menu_sel;
-	int ret = 0;
+	struct menu_responsive_layout layout;
+	int total = me_count(entries);
+	int capacity, pages, page, count, sel;
+	int footer = 1;
+	int *remembered;
+	int result = 0;
 	unsigned long inp;
 
-	if (count <= 0)
+	if (total <= 0)
 		return 0;
-	if (sel < 0 || sel > sel_max)
-		sel = 0;
-	while ((!entries[sel].enabled || !entries[sel].selectable) &&
-	       sel < sel_max)
-		sel++;
+	menu_draw_begin(1, 1);
+	capacity = menu_get_responsive_layout(&layout) ?
+		menu_style_page_capacity(&layout, me_mfont_h,
+			menu_sdl2_line_height(MENU_FONT_TITLE)) : 0;
+	menu_draw_end();
+	if (capacity <= 0)
+		return -1;
+	pages = (total - 1) / capacity + 1;
+	remembered = calloc(pages, sizeof(*remembered));
+	if (remembered == NULL)
+		return -1;
+	if (*menu_sel < 0 || *menu_sel >= total)
+		*menu_sel = 0;
+	page = *menu_sel / capacity;
+	sel = *menu_sel % capacity;
+	remembered[page] = sel;
 	while (in_menu_wait_any(NULL, 50) &
 	       (PBTN_MOK|PBTN_MBACK|PBTN_MENU))
 		;
 	for (;;) {
+		count = total - page * capacity;
+		if (count > capacity)
+			count = capacity;
 		struct cheats_menu_redraw redraw = {
-			.entries = entries,
+			.entries = entries + page * capacity,
+			.count = count,
 			.sel = sel,
+			.footer = footer,
+			.previous = page > 0,
+			.next = page + 1 < pages,
 			.selected_since = selected_since,
 			.draw_ok = 1,
 		};
 		int old_sel = sel;
 
-		if (!draw_cheats_menu_styled(entries, sel,
-				plat_get_ticks_ms() - selected_since))
-			return -1;
+		draw_cheats_menu_idle(&redraw);
+		if (!redraw.draw_ok) {
+			result = -1;
+			break;
+		}
 		inp = in_menu_wait_with_callback(
 			PBTN_UP|PBTN_DOWN|PBTN_LEFT|PBTN_RIGHT|
 			PBTN_MOK|PBTN_MBACK|PBTN_MENU|PBTN_L|PBTN_R,
 			NULL, 70, 33, draw_cheats_menu_idle, &redraw);
-		if (!redraw.draw_ok)
-			return -1;
+		if (!redraw.draw_ok) {
+			result = -1;
+			break;
+		}
 		if (inp & (PBTN_MENU|PBTN_MBACK))
 			break;
 		if (inp & PBTN_UP) {
-			do {
-				sel--;
-				if (sel < 0)
-					sel = sel_max;
-			}
-			while (!entries[sel].enabled || !entries[sel].selectable);
+			sel = sel == 0 ? count : sel - 1;
 		}
 		if (inp & PBTN_DOWN) {
-			do {
-				sel++;
-				if (sel > sel_max)
-					sel = 0;
-			}
-			while (!entries[sel].enabled || !entries[sel].selectable);
+			sel = sel == count ? 0 : sel + 1;
 		}
 		if (sel != old_sel)
 			selected_since = plat_get_ticks_ms();
+		if (sel < count)
+			remembered[page] = sel;
+		if (sel == count) {
+			if (inp & PBTN_LEFT)
+				footer = footer > (page > 0 ? 0 : 1) ? footer - 1 : footer;
+			if (inp & PBTN_RIGHT)
+				footer = footer < (page + 1 < pages ? 2 : 1) ? footer + 1 : footer;
+			if (inp & PBTN_MOK) {
+				if (footer == 1)
+					break;
+				page += footer == 0 ? -1 : 1;
+				sel = remembered[page];
+				footer = 1;
+				selected_since = plat_get_ticks_ms();
+			}
+			continue;
+		}
 		if ((inp & (PBTN_L|PBTN_R)) == (PBTN_L|PBTN_R))
 			debug_menu_loop();
 		if (inp & (PBTN_LEFT|PBTN_RIGHT|PBTN_L|PBTN_R)) {
-			if (me_process(&entries[sel],
+			if (me_process(&entries[page * capacity + sel],
 				       (inp & (PBTN_RIGHT|PBTN_R)) != 0,
 				       (inp & (PBTN_L|PBTN_R)) != 0))
 				continue;
 		}
-		if ((inp & (PBTN_MOK|PBTN_LEFT|PBTN_RIGHT|PBTN_L|PBTN_R)) &&
-		    entries[sel].handler != NULL &&
-		    (entries[sel].beh != MB_NONE || (inp & PBTN_MOK))) {
-			ret = entries[sel].handler(entries[sel].id, inp);
-			if (ret)
-				break;
-			count = me_count(entries);
-			sel_max = count - 1;
-		}
 	}
-	*menu_sel = sel;
-	return ret;
+	*menu_sel = page * capacity + remembered[page];
+	free(remembered);
+	return result;
 }
 
 #endif
@@ -805,13 +865,7 @@ static int menu_loop_cheats_page(int offset, int keys) {
 		option->handler = menu_loop_cheats_page;
 	}
 	int ret;
-#ifdef USE_SDL2
-	ret = menu_loop_cheats_styled(e_menu_cheats, &sel);
-	if (ret < 0)
-		ret = me_loop(e_menu_cheats, &sel);
-#else
 	ret = me_loop(e_menu_cheats, &sel);
-#endif
 	free(e_menu_cheats);
 	if (cheats_sel_per_page && page >= 0 && page < cheats_sel_pages_alloc)
 		cheats_sel_per_page[page] = sel;
@@ -820,7 +874,31 @@ static int menu_loop_cheats_page(int offset, int keys) {
 
 static int menu_loop_cheats(int id, int keys)
 {
+#ifdef USE_SDL2
+	menu_entry *entries;
+	int selected = 0;
+	int ret;
+	size_t i;
+
+	if (cheats == NULL || cheats->count == 0)
+		return 0;
+	entries = calloc(cheats->count + 1, sizeof(*entries));
+	if (entries == NULL)
+		return 0;
+	for (i = 0; i < cheats->count; i++) {
+		entries[i].name = cheats->cheats[i].name;
+		entries[i].beh = MB_OPT_ONOFF;
+		entries[i].var = &cheats->cheats[i].enabled;
+		entries[i].mask = 1;
+		entries[i].enabled = entries[i].selectable = 1;
+	}
+	ret = menu_loop_cheats_styled(entries, &selected);
+	free(entries);
+	if (ret < 0)
+		ret = menu_loop_cheats_page(0, keys);
+#else
 	int ret = menu_loop_cheats_page(0, keys);
+#endif
 	core_apply_cheats(cheats);
 	return ret;
 }

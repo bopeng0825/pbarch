@@ -43,6 +43,8 @@ load_state_title	Load state	读取状态	載入狀態
 save_state_title	Save state	保存状态	儲存狀態
 slot_fmt	SLOT %i (%s)	槽位 %i（%s）	欄位 %i（%s）
 slot_empty	Empty	空	空
+previous_page	Prev	上一页	上一頁
+next_page	Next	下一页	下一頁
 slot_saved	Saved	已保存	已儲存
 player_controls_fmt	Player %i controls	玩家 %i 控制	玩家 %i 控制
 emulator_controls	Emulator controls	模拟器控制	模擬器控制

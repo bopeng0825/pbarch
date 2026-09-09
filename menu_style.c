@@ -30,6 +30,18 @@ static int clip_rect(const struct menu_rect *rect, int width, int height,
 		clipped->top < clipped->bottom;
 }
 
+int menu_style_page_capacity(const struct menu_responsive_layout *layout,
+			    int line_height, int title_height)
+{
+	int available;
+
+	if (layout == NULL || line_height <= 0 || title_height <= 0)
+		return 0;
+	available = layout->menu.h - title_height - 3 * line_height / 4 -
+		line_height - line_height / 2;
+	return available > 0 ? available / line_height : 0;
+}
+
 int menu_style_main_geometry(const struct menu_responsive_layout *layout,
 			     int line_height, int text_height, int title_height,
 			     int glyph_width,
