@@ -236,7 +236,8 @@ static void h150101_sdl2_probe(const in_drv_t *drv)
 		joycount = 2;
 
 	for (i = 0; i < joycount; i++) {
-		joy = SDL_JoystickOpen(i);
+		int device = joycount - 1 - i;
+		joy = SDL_JoystickOpen(device);
 		if (!joy) {
 			continue;
 		}
@@ -250,14 +251,16 @@ static void h150101_sdl2_probe(const in_drv_t *drv)
 		state->drv = drv;
 		state->pdata = pdata->pdata;
 		state->joy = joy;
-		state->joy_index = i;
+		state->joy_index = device;
 		state->player = i;
 		state->joy_id = SDL_JoystickInstanceID(joy);
 		state->event_handler = pdata->handler;
 
-		joy_name = SDL_JoystickNameForIndex(i);
+		joy_name = SDL_JoystickNameForIndex(device);
 		if (!joy_name)
 			joy_name = "joystick";
+
+		printf("Joystick %d -> P%d: %s (instance=%d)\n", device, state->player + 1, joy_name, (int)state->joy_id);
 		if (state->player == 0)
 			snprintf(name, sizeof(name), IN_H150101_SDL2_PREFIX "%s",
 				joy_name);
