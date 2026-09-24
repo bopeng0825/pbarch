@@ -2,6 +2,11 @@
 
 static const struct core_override_option fceumm_core_option_overrides[] = {
 	{
+		.key = "fceumm_sndrate_hint",
+		.desc = "Sample Rate",
+		.default_value = "44KHz",
+	},
+	{
 		.key = "fceumm_ramstate",
 		.desc = "RAM Fill (Restart)",
 	},

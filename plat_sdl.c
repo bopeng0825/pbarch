@@ -1354,7 +1354,10 @@ static int plat_sound_init(void)
 
 	SDL_AudioSpec spec, received;
 
-	spec.freq = MIN(requested_sample_rate, MAX_SAMPLE_RATE);
+	/* Snes9x 2002 produces 32040 Hz audio, but many output devices require
+	 * a standard rate. Keep the core rate for the frontend resampler. */
+	spec.freq = !strcmp(core_name, "snes9x2002") ? 44100 :
+		MIN(requested_sample_rate, MAX_SAMPLE_RATE);
 	spec.format = AUDIO_S16;
 	spec.channels = 2;
 	spec.samples = 4096;
@@ -1488,7 +1491,7 @@ void plat_sound_resize_buffer(void) {
 	SDL_LockAudio();
 
 	audio.buf_len = frame_rate > 0
-		? current_audio_buffer_size * audio.in_sample_rate / frame_rate
+		? current_audio_buffer_size * audio.out_sample_rate / frame_rate
 		: 0;
 
 		/* Dynamic adjustment keeps buffer 50% full, need double size */
