@@ -517,7 +517,13 @@ int remove_config(config_type config_type) {
 
 static void perform_emu_action(void) {
 	static emu_action prev_action = EACTION_NONE;
+	static unsigned menu_capture_wait_frames;
 	emu_action action = eaction;
+
+	if (action == EACTION_MENU && !plat_video_menu_capture_ready() &&
+	    menu_capture_wait_frames++ < 3)
+		return;
+	menu_capture_wait_frames = 0;
 	eaction = EACTION_NONE;
 
 	if (prev_action != EACTION_NONE && prev_action == action) return;
@@ -685,7 +691,7 @@ static void perform_emu_action(void) {
 
 void handle_emu_action(emu_action action) {
 	if (action != EACTION_NONE) {
-		if (action == EACTION_MENU)
+		if (action == EACTION_MENU && eaction != EACTION_MENU)
 			plat_video_request_menu_capture();
 		eaction = action;
 	}

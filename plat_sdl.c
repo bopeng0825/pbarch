@@ -1047,6 +1047,15 @@ void plat_video_request_menu_capture(void)
 #endif
 }
 
+int plat_video_menu_capture_ready(void)
+{
+#ifdef USE_SDL2
+	return menu_capture_ready;
+#else
+	return 1;
+#endif
+}
+
 #ifdef USE_SDL2
 static int plat_sdl_capture_core_frame(const void *data, unsigned width,
 				       unsigned height, size_t pitch,
@@ -1054,8 +1063,12 @@ static int plat_sdl_capture_core_frame(const void *data, unsigned width,
 {
 	const void *source = data;
 	size_t source_pitch = pitch;
+	SDL_Rect source_rect, destination_rect;
 
-	if (!data || !g_menubg_src_ptr || width == 0 || height == 0)
+	if (!data || !g_menubg_src_ptr || width == 0 || height == 0 ||
+	    width > INT_MAX || height > INT_MAX ||
+	    !plat_sdl_is_hw_scale_supported(width, height, pitch, format) ||
+	    !plat_sdl_menu_source_dimensions_match())
 		return -1;
 	if (format == RETRO_PIXEL_FORMAT_XRGB8888) {
 		size_t needed = (size_t)width * height;
@@ -1092,9 +1105,37 @@ static int plat_sdl_capture_core_frame(const void *data, unsigned width,
 		return -1;
 	}
 
+	if (source_pitch % sizeof(uint16_t) != 0)
+		return -1;
+	plat_sdl_compute_hw_rects(width, height, &source_rect,
+				  &destination_rect);
+	if (source_rect.x < 0 || source_rect.y < 0 ||
+	    source_rect.w <= 0 || source_rect.h <= 0 ||
+	    (int64_t)source_rect.x + source_rect.w > width ||
+	    (int64_t)source_rect.y + source_rect.h > height ||
+	    destination_rect.x < 0 || destination_rect.y < 0 ||
+	    destination_rect.w <= 0 || destination_rect.h <= 0 ||
+	    (int64_t)destination_rect.x + destination_rect.w > g_menubg_src_w ||
+	    (int64_t)destination_rect.y + destination_rect.h > g_menubg_src_h)
+		return -1;
+
 	memset(g_menubg_src_ptr, 0,
 	       g_menubg_src_h * g_menubg_src_pp * sizeof(uint16_t));
-	scale(width, height, source_pitch, source, g_menubg_src_ptr);
+	for (int y = 0; y < destination_rect.h; y++) {
+		int source_y = source_rect.y +
+			(int)((uint64_t)y * source_rect.h / destination_rect.h);
+		const uint16_t *source_line = (const uint16_t *)
+			((const uint8_t *)source + (size_t)source_y * source_pitch);
+		uint16_t *destination_line = (uint16_t *)g_menubg_src_ptr +
+			(size_t)(destination_rect.y + y) * g_menubg_src_pp +
+			destination_rect.x;
+
+		for (int x = 0; x < destination_rect.w; x++) {
+			int source_x = source_rect.x +
+				(int)((uint64_t)x * source_rect.w / destination_rect.w);
+			destination_line[x] = source_line[source_x];
+		}
+	}
 	return 0;
 }
 #endif
@@ -1123,7 +1164,7 @@ void plat_video_process(const void *data, unsigned width, unsigned height, size_
 		menu_capture_ready =
 			plat_sdl_capture_core_frame(data, width, height, pitch,
 						    pixel_format) == 0;
-		menu_capture_requested = false;
+		menu_capture_requested = !menu_capture_ready;
 	}
 #endif
 
